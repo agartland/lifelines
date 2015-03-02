@@ -1,5 +1,42 @@
 ### Changelogs
 
+#### 0.7.0
+- allow for multiple fitters to be passed into `k_fold_cross_validation`. 
+- statistical tests in `lifelines.statstics`. now return a `StatisticalResult` object with properties like `p_value`, `test_results`, and `summary`.  
+- fixed a bug in how log-rank statistical tests are performed. The covariance matrix was not being correctly calculated. This resulted in slightly different p-values. 
+- `WeibullFitter`, `ExponentialFitter`, `KaplanMeierFitter` and `BreslowFlemingHarringtonFitter` all have a `conditional_time_to_event_` property that measures  the median duration remaining until the death event, given survival up until time t.
+
+#### 0.6.1
+
+- addition of `median_` property to `WeibullFitter` and `ExponentialFitter`. 
+- `WeibullFitter` and `ExponentialFitter` will use integer timelines instead of float provided by `linspace`. This is 
+so if your work is to sum up the survival function (for expected values or something similar), it's more difficult to 
+make a mistake. 
+
+#### 0.6.0
+
+- Inclusion of the univariate fitters `WeibullFitter` and `ExponentialFitter`. 
+- Removing `BayesianFitter` from lifelines.
+- Added new penalization scheme to AalenAdditiveFitter. You can now add a smoothing penalizer
+that will try to keep subsequent values of a hazard curve close together. The penalizing coefficient
+is `smoothing_penalizer`. 
+- Changed `penalizer` keyword arg to `coef_penalizer` in AalenAdditiveFitter.
+- new `ridge_regression` function in `utils.py` to perform linear regression with l2 penalizer terms.
+- Matplotlib is no longer a mandatory dependency. 
+- `.predict(time)` method on univariate fitters can now accept a scalar (and returns a scalar) and an iterable (and returns a numpy array)
+- In `KaplanMeierFitter`, `epsilon` has been renamed to `precision`. 
+
+
+#### 0.5.1
+
+- New API for `CoxPHFitter` and `AalenAdditiveFitter`: the default arguments for `event_col` and `duration_col`. `duration_col` is now mandatory, and `event_col` now accepts a column, or by default, `None`, which assumes all events are observed (non-censored).
+- Fix statistical tests.
+- Allow negative durations in Fitters.
+- New API in `survival_table_from_events`: `min_observations` is replaced by `birth_times` (default `None`).
+- New API in `CoxPHFitter` for summary: `summary` will return a dataframe with statistics, `print_summary()` will print the dataframe (plus some other statistics) in a pretty manner.
+- Adding "At Risk" counts option to univariate fitter `plot` methods, `.plot(at_risk_counts=True)`, and the function `lifelines.plotting.add_at_risk_counts`.
+- Fix bug Epanechnikov kernel.  
+
 #### 0.5.0
 
 - move testing to py.test

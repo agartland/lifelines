@@ -1,7 +1,122 @@
-More examples and recipes
+More Examples and Recipes
 ==================================
 
 This section goes through some examples and recipes to help you use *lifelines*. 
+
+
+Compare two populations statistically
+##############################################
+
+(though this applies just as well to Nelson-Aalen estimates). Often researchers want to compare
+survival curves between different populations. Here are some techniques to do that: 
+
+Subtract the difference between survival curves
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you are interested in taking the difference between two survival curves, simply trying to 
+subtract the ``survival_function_`` will likely fail if the DataFrame's indexes are not equal. Fortunately, 
+the ``KaplanMeierFitter`` and ``NelsonAalenFitter`` have a built in ``subtract`` method: 
+
+.. code-block:: python
+    
+    kmf1.subtract(kmf2)
+
+will produce the difference at every relevant time point. A similar function exists for division: ``divide``.
+
+Compare using a hypothesis test
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For rigorous testing of differences, *lifelines* comes with a statistics library. The ``logrank_test`` function
+compares whether the "death" generation process of the two populations are equal:
+
+.. code-block:: python
+    
+    from lifelines.statistics import logrank_test
+
+    results = logrank_test(T1, T2, event_observed_A=C1, event_observed_B=C2)
+    results.print_summary()
+
+    """
+    Results
+        df: 1
+       alpha: 0.95
+       t 0: -1
+       test: logrank
+       null distribution: chi squared
+
+       __ p-value ___|__ test statistic __|____ test results ____|__ significant __
+             0.46759 |              0.528 |  Cannot Reject Null  |      False
+   """
+
+   print results.p_value     # 0.46759 
+   print results.test_statistic # 0.528
+   print results.is_significant # False
+
+
+If you have more than two populations, you can use ``pairwise_logrank_test`` (which compares
+each pair in the same manner as above), or ``multivariate_logrank_test`` (which tests the 
+hypothesis that all the populations have the same "death" generation process).
+
+
+
+
+Model selection using *lifelines*
+#####################################################
+
+If using *lifelines* for prediction work, it's ideal that you perform some sort of cross-validation scheme. This allows you to be confident that your out-of-sample predictions will work well in practice. It also allows you to choose between multiple models.
+
+*lifelines* has a built in k-fold cross-validation function. For example, consider the following example:
+
+.. code-block:: python
+    
+    from lifelines import AalenAdditiveFitter, CoxPHFitter
+    from lifelines.datasets import load_regression_dataset
+    from lifelines.utils import k_fold_cross_validation
+    
+    df = load_regression_dataset()
+
+    #create the three models we'd like to compare.
+    aaf_1 = AalenAdditiveFitter(penalizer=0.5)
+    aaf_2 = AalenAdditiveFitter(penalizer=10)
+    cph = CoxPHFitter() 
+
+    print k_fold_cross_validation(cph, df, duration_col='T', event_col='E').mean()
+    print k_fold_cross_validation(aaf_1, df, duration_col='T', event_col='E').mean()
+    print k_fold_cross_validation(aaf_2, df, duration_col='T', event_col='E').mean()
+
+From these results, Aalen's Additive model with a penalizer of 10 is best model of predicting future survival times.
+
+Displaying at-risk counts below plots
+#####################################################
+The function ``add_at_risk_counts`` in ``lifelines.plotting`` allows you to add At-Risk counts at the bottom of your figures. For example:
+
+.. code-block:: python
+    
+    from numpy.random import exponential
+    T_control = exponential(10, size=250)
+    T_experiment = exponential(20, size=200)
+    ax = plt.subplot(111)
+
+    from lifelines import KaplanMeierFitter
+
+    kmf_control = KaplanMeierFitter()
+    ax = kmf_control.fit(T_control, label='control').plot(ax=ax)
+
+    kmf_exp = KaplanMeierFitter()
+    ax = kmf_exp.fit(T_experiment, label='experiment').plot(ax=ax)
+
+
+    from lifelines.plotting import add_at_risk_counts
+    add_at_risk_counts(kmf_exp, kmf_control, ax=ax)
+
+will display
+
+.. image:: /images/add_at_risk.png 
+   :height: 300
+
+
+Alternatively, you can add this at the call to ``plot``: ``kmf.plot(at_risk_counts=True)``
+
 
 Getting survival-table data into *lifelines* format
 #####################################################
@@ -32,7 +147,7 @@ time (months, days, ...)      observed deaths       censored
 
     from lifelines.utils import survival_events_from_table
 
-    T,C = survival_events_from_table(df, observed_deaths_col='observed deaths', censored_col='censoreds')
+    T,C = survival_events_from_table(df, observed_deaths_col='observed deaths', censored_col='censored')
     print T # np.array([0,0,0,0,0,0,0,1,2,2, ...])
     print C # np.array([1,1,1,1,1,1,1,0,1,1, ...])
 
@@ -61,15 +176,8 @@ If you have a pandas `DataFrame` with columns "group", "T", and "C", then someth
     
     ax = plt.subplot(111)
 
-    #group the data by column 'group'
-    grouped_data = df.groupby("group")
-
-    #iterate over the groups and plot the estimate + 95% intervals.
-    unique_groups = grouped_data.groups.keys()
-    unique_groups.sort()
-
     kmf = KaplanMeierFitter()
-    for i, group in enumerate(unique_groups):
+    for group in df['group'].unique():
         data = grouped_data.get_group(group)
         kmf.fit(data["T"], data["C"], label=group)
         kmf.plot(ax=ax)
@@ -129,61 +237,6 @@ Hide confidence intervals
    :height: 300
 
 
-Compare two Kaplan-Meier Estimates
-##############################################
-
-(though this applies just as well to Nelson-Aalen estimates). Often researchers want to compare
-survival curves between different populations. Here are some techniques to do that: 
-
-Subtract the difference between survival curves
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-If you are interested in taking the difference between two survival curves, simply trying to 
-subtract the ``survival_function_`` will likely fail if the DataFrame's indexes are not equal. Fortunately, 
-the ``KaplanMeierFitter`` and ``NelsonAalenFitter`` have a built in ``subtract`` method: 
-
-.. code-block:: python
-    
-    kmf1.subtract(kmf2)
-
-will produce the difference at every relevant time point. A similar function exists for division: ``divide``.
-
-Compare using a hypothesis test
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-For rigorous testing of differences, *lifelines* comes with a statistics library. The ``logrank_test`` function
-compares whether the "death" generation process of the two populations are equal:
-
-.. code-block:: python
-    
-    from lifelines.statistics import logrank_test
-
-    summary, p_value, test_result = logrank_test(T1, T2, event_observed_A=C1, event_observed_B=C2)
-
-    print summary
-
-    """
-    Results
-        df: 1
-       alpha: 0.95
-       t 0: -1
-       test: logrank
-       null distribution: chi squared
-
-       __ p-value ___|__ test statistic __|__ test results __
-             0.46759 |              0.528 |     None
-   """
-
-   print p_value     # 0.46759 
-   print test_result # None
-
-
-If you have more than two populations, you can use ``pairwise_logrank_test`` (which compares
-each pair in the same manner as above), or ``multivariate_logrank_test`` (which tests the 
-hypothesis that all the populations have the same "death" generation process).
-
-
-
 Set the index/timeline of a estimate
 ##############################################
 
@@ -224,7 +277,7 @@ Suppose your dataset has lifetimes grouped near time 60, thus after fitting
 
 What you would really like is to have a predictable and full index from 40 to 75. (Notice that
 in the above index, the last two time points are not adjacent -- this is caused by observing no lifetimes
-existing for at times 72 or 73) This is especially useful for comparing multiple survival functions at specific time points. To do this, all fitter methods accept a `timeline` argument: 
+existing for times 72 or 73) This is especially useful for comparing multiple survival functions at specific time points. To do this, all fitter methods accept a `timeline` argument: 
 
 .. code-block:: python
 
@@ -274,7 +327,7 @@ existing for at times 72 or 73) This is especially useful for comparing multiple
 Example SQL query to get data from a table
 ##############################################
 
-Below is a way to get an example dataset from a relation database (this may vary depending on your database):
+Below is a way to get an example dataset from a relational database (this may vary depending on your database):
 
 .. code-block:: mysql
 

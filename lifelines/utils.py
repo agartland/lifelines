@@ -4,10 +4,57 @@ from __future__ import print_function, division
 from datetime import datetime
 
 import numpy as np
+from numpy.linalg import inv
 import pandas as pd
 from pandas import to_datetime
 
 from lifelines._utils import concordance_index as _cindex
+
+
+def l1_log_loss(event_times, predicted_event_times, event_observed=None):
+    """
+    Calculates the l1 log-loss of predicted event times to true event times for *non-censored*
+    individuals only.
+
+    1/N \sum_{i} |log(t_i) - log(q_i)|
+
+    Parameters:
+      event_times: a (n,) array of observed survival times.
+      predicted_event_times: a (n,) array of predicted survival times.
+      event_observed: a (n,) array of censorship flags, 1 if observed,
+                      0 if not. Default None assumes all observed.
+
+    Returns:
+      l1-log-loss: a scalar
+    """
+    if event_observed is None:
+        event_observed = np.ones_like(event_times)
+
+    ix = event_observed.astype(bool)
+    return np.abs(np.log(event_times[ix]) - np.log(predicted_event_times[ix])).mean()
+
+
+def l2_log_loss(event_times, predicted_event_times, event_observed=None):
+    """
+    Calculates the l2 log-loss of predicted event times to true event times for *non-censored*
+    individuals only.
+
+    1/N \sum_{i} (log(t_i) - log(q_i))**2
+
+    Parameters:
+      event_times: a (n,) array of observed survival times.
+      predicted_event_times: a (n,) array of predicted survival times.
+      event_observed: a (n,) array of censorship flags, 1 if observed,
+                      0 if not. Default None assumes all observed.
+
+    Returns:
+      l2-log-loss: a scalar
+    """
+    if event_observed is None:
+        event_observed = np.ones_like(event_times)
+
+    ix = event_observed.astype(bool)
+    return np.power(np.log(event_times[ix]) - np.log(predicted_event_times[ix]), 2).mean()
 
 
 def concordance_index(event_times, predicted_event_times, event_observed=None):
@@ -33,7 +80,7 @@ def concordance_index(event_times, predicted_event_times, event_observed=None):
       event_times: a (n,) array of observed survival times.
       predicted_event_times: a (n,) array of predicted survival times.
       event_observed: a (n,) array of censorship flags, 1 if observed,
-                      0 if not. Default assumes all observed.
+                      0 if not. Default None assumes all observed.
 
     Returns:
       c-index: a value between 0 and 1.
@@ -60,6 +107,10 @@ def concordance_index(event_times, predicted_event_times, event_observed=None):
 
     if event_observed is None:
         event_observed = np.ones(event_times.shape[0], dtype=float)
+    else:
+        if event_observed.shape != event_times.shape:
+            raise ValueError("Observed events must be 1-dimensional of same length as event times")
+        event_observed = np.array(event_observed, dtype=float).ravel()
 
     # 100 times faster to calculate in Fortran
     return _cindex(event_times,
@@ -71,7 +122,7 @@ def coalesce(*args):
     return next(s for s in args if s is not None)
 
 
-def group_survival_table_from_events(groups, durations, event_observed, min_observations, limit=-1):
+def group_survival_table_from_events(groups, durations, event_observed, birth_times=None, limit=-1):
     """
     Joins multiple event series together into dataframes. A generalization of
     `survival_table_from_events` to data with groups. Previously called `group_event_series` pre 0.2.3.
@@ -80,9 +131,9 @@ def group_survival_table_from_events(groups, durations, event_observed, min_obse
         groups: a (n,) array of individuals' group ids.
         durations: a (n,)  array of durations of each individual
         event_observed: a (n,) array of event observations, 1 if observed, 0 else.
-        min_observations: a (n,) array of times individual entered study. This is most applicable in
-                    cases where there is left-truncation, i.e. a individual might enter the
-                    study late. If not the case, normally set to all zeros.
+        birth_times: a (n,) array of numbers representing
+          when the subject was first observed. A subject's death event is then at [birth times + duration observed].
+          Normally set to all zeros, but can be positive or negative.
 
     Output:
         - np.array of unique groups
@@ -123,9 +174,16 @@ def group_survival_table_from_events(groups, durations, event_observed, min_obse
         ]
 
     """
-    n = max(groups.shape)
-    assert n == max(durations.shape) == max(event_observed.shape) == max(min_observations.shape), "inputs must be of the same length."
-    groups, durations, event_observed, min_observations = map(lambda x: pd.Series(np.reshape(x, (n,))), [groups, durations, event_observed, min_observations])
+    n = np.max(groups.shape)
+    assert n == np.max(durations.shape) == np.max(event_observed.shape), "inputs must be of the same length."
+    if birth_times is None:
+        # Create some birth times
+        birth_times = np.zeros(np.max(durations.shape))
+        birth_times[:] = np.min(durations)
+
+    assert n == np.max(birth_times.shape), "inputs must be of the same length."
+
+    groups, durations, event_observed, birth_times = map(lambda x: pd.Series(np.reshape(x, (n,))), [groups, durations, event_observed, birth_times])
     unique_groups = groups.unique()
 
     # set first group
@@ -133,7 +191,7 @@ def group_survival_table_from_events(groups, durations, event_observed, min_obse
     ix = (groups == g)
     T = durations[ix]
     C = event_observed[ix]
-    B = min_observations[ix]
+    B = birth_times[ix]
 
     g_name = str(g)
     data = survival_table_from_events(T, C, B,
@@ -142,7 +200,7 @@ def group_survival_table_from_events(groups, durations, event_observed, min_obse
         ix = groups == g
         T = durations[ix]
         C = event_observed[ix]
-        B = min_observations[ix]
+        B = birth_times[ix]
         g_name = str(g)
         data = data.join(survival_table_from_events(T, C, B,
                                                     columns=['removed:' + g_name, "observed:" + g_name, 'censored:' + g_name, 'entrance' + g_name]),
@@ -154,15 +212,15 @@ def group_survival_table_from_events(groups, durations, event_observed, min_obse
     return unique_groups, data.filter(like='removed:'), data.filter(like='observed:'), data.filter(like='censored:')
 
 
-def survival_table_from_events(durations, event_observed, min_observations,
+def survival_table_from_events(death_times, event_observed, birth_times=None,
                                columns=["removed", "observed", "censored", "entrance"], weights=None):
     """
     Parameters:
-        durations: (n,1) array of event times (durations individual was observed for)
-        event_observed: (n,1) boolean array, 1 if observed event, 0 is censored event.
-        min_observations: used for left truncation data. Sometimes subjects will show
-          up late in the study. min_observations is a (n,1) array of positive numbers representing
-          when the subject was first observed. A subject's life is then [min observation + duration observed]
+        death_times: (n,) array of event times
+        event_observed: (n,) boolean array, 1 if observed event, 0 is censored event.
+        birth_times: a (n,) array of numbers representing
+          when the subject was first observed. A subject's death event is then at [birth times + duration observed].
+          If None (default), birth_times are set to be the first observation or 0, which ever is smaller.
         columns: a 3-length array to call the, in order, removed individuals, observed deaths
           and censorships.
         weights: Default None, otherwise (n,1) array. Optional argument to use weights for individuals.
@@ -190,21 +248,26 @@ def survival_table_from_events(durations, event_observed, min_observations,
         15              2         2         0         0
 
     """
-    # deal with deaths and censorships
+    death_times = np.asarray(death_times)
+    if birth_times is None:
+        birth_times = min(0, death_times.min()) * np.ones(death_times.shape[0])
+    else:
+        birth_times = np.asarray(birth_times)
+        if np.any(birth_times > death_times):
+            raise ValueError('birth time must be less than time of death.')
 
-    durations = np.asarray(durations) + min_observations
-    df = pd.DataFrame(durations, columns=["event_at"])
+    # deal with deaths and censorships
+    df = pd.DataFrame(death_times, columns=["event_at"])
     df[columns[0]] = 1 if weights is None else weights
-    df[columns[1]] = event_observed
+    df[columns[1]] = np.asarray(event_observed)
     death_table = df.groupby("event_at").sum()
     death_table[columns[2]] = (death_table[columns[0]] - death_table[columns[1]]).astype(int)
 
     # deal with late births
-    births = pd.DataFrame(min_observations, columns=['event_at'])
+    births = pd.DataFrame(birth_times, columns=['event_at'])
     births[columns[3]] = 1
     births_table = births.groupby('event_at').sum()
 
-    # this next line can be optimized for when min_observerations is all zeros.
     event_table = death_table.join(births_table, how='outer', sort=True).fillna(0)  # http://wesmckinney.com/blog/?p=414
     return event_table.astype(float)
 
@@ -322,32 +385,55 @@ def AandS_approximation(p):
     return t - (c_0 + c_1 * t + c_2 * t ** 2) / (1 + d_1 * t + d_2 * t * t + d_3 * t ** 3)
 
 
-def k_fold_cross_validation(fitter, df, duration_col='T', event_col='E',
-                            k=5, evaluation_measure=concordance_index, predictor="predict_median",
-                            predictor_kwargs={}):
+def k_fold_cross_validation(fitters, df, duration_col, event_col=None,
+                            k=5, evaluation_measure=concordance_index,
+                            predictor="predict_median", predictor_kwargs={}):
     """
-    Perform cross validation on a dataset.
+    Perform cross validation on a dataset. If multiple models are provided,
+    all models will train on each of the k subsets.
 
-    fitter: either an instance of AalenAdditiveFitter or CoxPHFitter.
+    fitter(s): one or several objects which possess a method:
+                   fit(self, data, duration_col, event_col)
+               Note that the last two arguments will be given as keyword arguments,
+               and that event_col is optional. The objects must also have
+               the "predictor" method defined below.
     df: a Pandas dataframe with necessary columns `duration_col` and `event_col`, plus
         other covariates. `duration_col` refers to the lifetimes of the subjects. `event_col`
         refers to whether the 'death' events was observed: 1 if observed, 0 else (censored).
     duration_col: the column in dataframe that contains the subjects lifetimes.
-    event_col: the column in dataframe that contains the subject's death observation.    loss functions:
+    event_col: the column in dataframe that contains the subject's death observation. If left
+               as None, assumes all individuals are non-censored.
     k: the number of folds to perform. n/k data will be withheld for testing on.
     evaluation_measure: a function that accepts either (event_times, predicted_event_times),
-                  or (event_times, predicted_event_times, event_observed) and returns a scalar value.
-                  Default: statistics.concordance_index: (C-index) between two series of event times
-    predictor: a string that matches a prediction method on the fitter instances. For example,
-            "predict_expectation" or "predict_percentile". Default is "predict_median"
-    predictor_kwargs: keyward args to pass into predictor.
+                        or (event_times, predicted_event_times, event_observed)
+                        and returns something (could be anything).
+                        Default: statistics.concordance_index: (C-index)
+                        between two series of event times
+    predictor: a string that matches a prediction method on the fitter instances.
+               For example, "predict_expectation" or "predict_percentile".
+               Default is "predict_median"
+               The interface for the method is:
+                   predict(self, data, **optional_kwargs)
+    predictor_kwargs: keyword args to pass into predictor-method.
 
     Returns:
-        (k,1) array of scores for each fold.
+        (k,1) list of scores for each fold. The scores can be anything.
     """
+    # Make sure fitters is a list
+    try:
+        fitters = list(fitters)
+    except TypeError:
+        fitters = [fitters]
+    # Each fitter has its own scores
+    fitterscores = [[] for _ in fitters]
+
     n, d = df.shape
-    scores = np.zeros((k,))
     df = df.copy()
+
+    if event_col is None:
+        event_col = 'E'
+        df[event_col] = 1.
+
     df = df.reindex(np.random.permutation(df.index)).sort(event_col)
 
     assignments = np.array((n // k + 1) * list(range(1, k + 1)))
@@ -365,16 +451,21 @@ def k_fold_cross_validation(fitter, df, duration_col='T', event_col='E',
         E_actual = testing_data[event_col].values
         X_testing = testing_data[testing_columns]
 
-        # fit the fitter to the training data
-        fitter.fit(training_data, duration_col=duration_col, event_col=event_col)
-        T_pred = getattr(fitter, predictor)(X_testing, **predictor_kwargs).values
+        for fitter, scores in zip(fitters, fitterscores):
+            # fit the fitter to the training data
+            fitter.fit(training_data, duration_col=duration_col, event_col=event_col)
+            T_pred = getattr(fitter, predictor)(X_testing, **predictor_kwargs).values
 
-        try:
-            scores[i - 1] = evaluation_measure(T_actual, T_pred, E_actual)
-        except TypeError:
-            scores[i - 1] = evaluation_measure(T_actual, T_pred)
+            try:
+                scores.append(evaluation_measure(T_actual, T_pred, E_actual))
+            except TypeError:
+                scores.append(evaluation_measure(T_actual, T_pred))
 
-    return scores
+    # If a single fitter was given as argument, return a single result
+    if len(fitters) == 1:
+        return fitterscores[0]
+    else:
+        return fitterscores
 
 
 def normalize(X, mean=None, std=None):
@@ -451,3 +542,43 @@ def qth_survival_time(q, survival_function):
 
 def median_survival_times(survival_functions):
     return qth_survival_times(0.5, survival_functions)
+
+
+def ridge_regression(X, Y, c1=0.0, c2=0.0, offset=None):
+    """
+    Also known as Tikhonov regularization. This solves the minimization problem:
+
+    min_{beta} ||(beta X - Y)||^2 + c1||beta||^2 + c2||beta - offset||^2
+
+    One can find more information here: http://en.wikipedia.org/wiki/Tikhonov_regularization
+
+    Parameters:
+        X: a (n,d) numpy array
+        Y: a (n,) numpy array
+        c1: a scalar
+        c2: a scalar
+        offset: a (d,) numpy array.
+
+    Returns:
+        beta_hat: the solution to the minimization problem.
+        V = (X*X^T + (c1+c2)I)^{-1} X^T
+
+    """
+    n, d = X.shape
+    X = X.astype(float)
+    penalizer_matrix = (c1 + c2) * np.eye(d)
+
+    if offset is None:
+        offset = np.zeros((d,))
+
+    V_1 = inv(np.dot(X.T, X) + penalizer_matrix)
+    V_2 = (np.dot(X.T, Y) + c2 * offset)
+    beta = np.dot(V_1, V_2)
+
+    return beta, np.dot(V_1, X.T)
+
+
+def _smart_search(minimizing_function, n, *args):
+    from scipy.optimize import fmin_powell
+    x = np.ones(n)
+    return fmin_powell(minimizing_function, x, args=args, disp=False)
