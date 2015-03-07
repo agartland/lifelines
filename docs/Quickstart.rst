@@ -23,11 +23,21 @@ Let's start by importing some data. We need the durations that individuals are o
 
 .. code:: python
 
-    from lifelines.datasets import generate_waltons_dataset
-    data = generate_waltons_dataset()    
+    from lifelines.datasets import load_waltons
+    df = load_waltons() # returns a Pandas DataFrame
 
-    T = data['T']
-    E = data['E']
+    print df.head()
+    """
+        T  E    group
+    0   6  1  miR-137
+    1  13  1  miR-137
+    2  13  1  miR-137
+    3  13  1  miR-137
+    4  19  1  miR-137
+    """
+
+    T = df['T']
+    E = df['E']
 
 ``T`` is an array of durations, ``E`` is a either boolean or binary array representing whether the "death" was observed (alternatively an individual can be censored). 
 
@@ -38,12 +48,14 @@ Let's start by importing some data. We need the durations that individuals are o
 
     from lifelines import KaplanMeierFitter
     kmf = KaplanMeierFitter()
-    kmf.fit(T, event_observed=E)
+    kmf.fit(T, event_observed=E) # more succiently, kmf.fit(T,E)
 
-After calling the ``fit`` method, we have access to new properties like ``survival_function_`` and methods like ``plot()``. The latter is a wrapper around Pandas internal plotting library (see `here <http://lifelines.readthedocs.org/en/latest/examples.html#plotting-options-and-styles>`__ for examples). 
+After calling the ``fit`` method, we have access to new properties like ``survival_function_`` and methods like ``plot()``. The latter is a wrapper around Pandas internal plotting library. 
 
 .. code:: python
     
+    kmf.survival_function_
+    kmf.median_
     kmf.plot()
 
 
@@ -55,13 +67,13 @@ Multiple groups
 
 .. code:: python
     
-    groups = waltons_dataset['group']
-    ix = groups == 'control'
+    groups = df['group']
+    ix = (groups == 'miR-137')
 
-    kmf.fit(T[ix], E[ix], label='control')
+    kmf.fit(T[~ix], E[~ix], label='control')
     ax = kmf.plot()
 
-    kmf.fit(T[~ix], E[~ix], label='miR-137')
+    kmf.fit(T[ix], E[ix], label='miR-137')
     kmf.plot(ax=ax)
 
 .. image:: images/quickstart_multi.png   
@@ -79,6 +91,24 @@ but instead of a ``survival_function_`` being exposed, a ``cumulative_hazard_`` 
 
 .. note:: Similar to Scikit-Learn, all statistically estimated quanities append an underscore to the property name. 
 
+Getting Data in The Right Format
+---------------------------------
+
+Often you'll have data that looks like:
+
+*start_time*, *end_time*
+
+Lifelines has some utility functions to transform this dataset into durations and censorships:
+
+.. code:: python
+    
+    from lifelines.utils import datetimes_to_durations
+
+    # start_times is a vector of datetime objects
+    # end_times is a vector of (possibly missing) datetime objects. 
+    T, C = datetimes_to_durations(start_times, end_times, freq='h')
+
+
 Survival Regression
 ---------------------------------
 
@@ -86,8 +116,8 @@ While the above ``KaplanMeierFitter`` and ``NelsonAalenFitter`` are useful, they
 
 .. code:: python
     
-    from lifelines.datasets import generate_regression_dataset
-    regression_dataset = generate_regression_dataset()
+    from lifelines.datasets import load_regression_dataset
+    regression_dataset = load_regression_dataset()
 
     regression_dataset.head()
 
@@ -101,12 +131,12 @@ The input of the ``fit`` method's API on ``AalenAdditiveFitter`` is different th
 
     # Using Cox Proportional Hazards model
     cf = CoxPHFitter()
-    cf.fit(regression_dataset, duration_col='T', event_col='E')
-    print cf.summary
+    cf.fit(regression_dataset, 'T', event_col='E')
+    cf.print_summary()
 
     # Using Aalen's Additive model
     aaf = AalenAdditiveFitter(fit_intercept=False)
-    aaf.fit(regression_dataset, duration_col='T', event_col='E')
+    aaf.fit(regression_dataset, 'T', event_col='E')
 
 
 After fitting, you'll have access to properties like ``cumulative_hazards_`` and methods like ``plot``, ``predict_cumulative_hazards``, and ``predict_survival_function``. The latter two methods require an additional argument of individual covariates:

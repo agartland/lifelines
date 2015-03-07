@@ -45,7 +45,9 @@ Let's bring in our dataset.
 .. code:: python
 
     import pandas as pd
-    data = pd.read_csv('datasets/dd.csv', header = 0, index_col=0 )
+    import lifelines 
+
+    data = lifelines.datasets.load_dd()
 
 .. code:: python
 
@@ -173,7 +175,7 @@ office, and whether or not they were observed to have left office
 this data was record at, do not have observed death events)
 
 We next use the ``KaplanMeierFitter`` method ``fit`` to fit the model to
-the data. (This is similar to, and was inspired by, another popular
+the data. (This is similar to, and inspired by, another popular
 Python library `scikit-learn's <http://scikit-learn.org/stable/>`__
 fit/predict API)
 
@@ -202,10 +204,10 @@ Below we fit our data to the fitter:
 
 .. code:: python
 
-    T = data["duration"] #measure in years
+    T = data["duration"] 
     C = data["observed"] 
 
-    kmf.fit(T, event_observed=C ) #returns self
+    kmf.fit(T, event_observed=C )
 
 
 
@@ -244,7 +246,7 @@ to plot both the KM estimate and its confidence intervals:
 
 .. image:: Introtolifelines_files/Introtolifelines_15_1.png
 
-.. note::  Don't like the shaded area for confidence intervals? See below for examples on how to change this
+.. note::  Don't like the shaded area for confidence intervals? See below for examples on how to change this.
 
 
 The median time in office, which defines the point in time where on
@@ -271,7 +273,7 @@ an ``axis`` object, that can be used for plotting further estimates:
 
     ax = plt.subplot(111)
     
-    dem = data["democracy"] == "Democracy"
+    dem = (data["democracy"] == "Democracy")
     kmf.fit(T[dem], event_observed=C[dem], label="Democratic Regimes")
     kmf.plot(ax=ax, ci_force_lines=True)
     kmf.fit(T[~dem], event_observed=C[~dem], label="Non-democratic Regimes")
@@ -340,8 +342,9 @@ we rule that the series have different generators.
 
     from lifelines.statistics import logrank_test
     
-    summary, p_value, test_results = logrank_test(T[dem], T[~dem], C[dem], C[~dem], alpha=.99 )
-    print summary
+    results = logrank_test(T[dem], T[~dem], C[dem], C[~dem], alpha=.99 )
+
+    results.print_summary()
 
 .. parsed-literal::
 
@@ -352,8 +355,8 @@ we rule that the series have different generators.
        test: logrank
        null distribution: chi squared
     
-       __ p-value ___|__ test statistic __|__ test results __
-             0.00000 |              208.306 |     True   
+       __ p-value ___|__ test statistic __|____ test results ____|__ significant __
+             0.00000 |            208.306 |      Reject Null     |     True
 
 
 Lets compare the different *types* of regimes present in the dataset:
@@ -609,7 +612,7 @@ Left Truncated Data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Another form of bias that can be introduced into a dataset is called left-truncation. (Also a form of censorship). 
-This occurs when individuals may die before ever entrying into the study. Both  ``KaplanMeierFitter`` and ``NelsonAalenFitter`` have an optional arugment for ``entry``, which is of equal size to the duration array.
+This occurs when individuals may die even before ever entrying into the study. Both  ``KaplanMeierFitter`` and ``NelsonAalenFitter`` have an optional arugment for ``entry``, which is an array of equal size to the duration array.
 It describes the offset from birth to entering the study. This is also useful when subjects enter the study at different
 points in their lifetime. For example, if you are measuring time to death of prisoners in 
 prison, the prisoners will enter the study at different ages. 
