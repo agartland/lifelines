@@ -293,8 +293,7 @@ class NelsonAalenFitter(BaseFitter):
             self._variance_f = self._variance_f_discrete
             self._additive_f = self._additive_f_discrete
 
-    def fit(self, durations, event_observed=None, timeline=None, entry=None,
-            label='NA_estimate', alpha=None, ci_labels=None):
+    def fit(self, durations, event_observed=None, timeline=None, entry=None,label='NA-estimate', alpha=None, ci_labels=None, weights = None):
         """
         Parameters:
           duration: an array, or pd.Series, of length n -- duration subject was observed for
@@ -309,13 +308,14 @@ class NelsonAalenFitter(BaseFitter):
              alpha for this call to fit only.
           ci_labels: add custom column names to the generated confidence intervals
                 as a length-2 list: [<lower-bound name>, <upper-bound name>]. Default: <label>_lower_<alpha>
+          weights: an array of length n -- weight for each subject
 
         Returns:
           self, with new properties like 'cumulative_hazard_'.
 
         """
 
-        v = preprocess_inputs(durations, event_observed, timeline, entry)
+        v = preprocess_inputs(durations, event_observed, timeline, entry, weights)
         self.durations, self.event_observed, self.timeline, self.entry, self.event_table = v
 
         cumulative_hazard_, cumulative_sq_ = _additive_estimate(self.event_table, self.timeline,
@@ -1511,7 +1511,7 @@ def _predict(fitter, estimate, label):
     return predict
 
 
-def preprocess_inputs(durations, event_observed, timeline, entry):
+def preprocess_inputs(durations, event_observed, timeline, entry, weights = None):
 
     n = len(durations)
     durations = np.asarray(durations).reshape((n,))
@@ -1525,7 +1525,8 @@ def preprocess_inputs(durations, event_observed, timeline, entry):
     if entry is not None:
         entry = np.asarray(entry).reshape((n,))
 
-    event_table = survival_table_from_events(durations, event_observed, entry)
+    event_table = survival_table_from_events(durations, event_observed, entry, weights=weights)
+
     if timeline is None:
         timeline = event_table.index.values
     else:
