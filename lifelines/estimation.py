@@ -1525,7 +1525,7 @@ def preprocess_inputs(durations, event_observed, timeline, entry, weights = None
     if entry is not None:
         entry = np.asarray(entry).reshape((n,))
 
-    event_table = survival_table_from_events(durations, event_observed, entry, weights)
+    event_table = survival_table_from_events(durations, event_observed, entry, weights=weights)
 
     if timeline is None:
         timeline = event_table.index.values

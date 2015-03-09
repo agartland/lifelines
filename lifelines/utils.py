@@ -221,8 +221,8 @@ def survival_table_from_events(death_times, event_observed, birth_times=None,
         birth_times: a (n,) array of numbers representing
           when the subject was first observed. A subject's death event is then at [birth times + duration observed].
           If None (default), birth_times are set to be the first observation or 0, which ever is smaller.
-        columns: a 3-length array to call the, in order, removed individuals, observed deaths
-          and censorships.
+        columns: a 4-length array to call the, in order, removed individuals, observed deaths,
+          censorships and entrants.
         weights: Default None, otherwise (n,1) array. Optional argument to use weights for individuals.
     Returns:
         Pandas DataFrame with index as the unique times in event_times. The columns named
@@ -256,16 +256,22 @@ def survival_table_from_events(death_times, event_observed, birth_times=None,
         if np.any(birth_times > death_times):
             raise ValueError('birth time must be less than time of death.')
 
+    if weights is None:
+        weights = np.ones(death_times.shape[0])
+    else:
+        weights = np.asarray(weights)
+
     # deal with deaths and censorships
     df = pd.DataFrame(death_times, columns=["event_at"])
-    df[columns[0]] = 1 if weights is None else weights
-    df[columns[1]] = np.asarray(event_observed)
+    #df[columns[0]] = 1 if weights is None else weights
+    df[columns[0]] = np.ones(df.shape[0]) * weights
+    df[columns[1]] = np.asarray(event_observed) * weights
     death_table = df.groupby("event_at").sum()
     death_table[columns[2]] = (death_table[columns[0]] - death_table[columns[1]]).astype(int)
 
     # deal with late births
     births = pd.DataFrame(birth_times, columns=['event_at'])
-    births[columns[3]] = 1
+    births[columns[3]] = weights
     births_table = births.groupby('event_at').sum()
 
     event_table = death_table.join(births_table, how='outer', sort=True).fillna(0)  # http://wesmckinney.com/blog/?p=414
