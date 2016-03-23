@@ -1,4 +1,8 @@
-Introduction to using *lifelines*
+.. image:: http://i.imgur.com/EOowdSD.png
+
+-------------------------------------
+
+Introduction to using lifelines
 =====================================
 
 In the previous :doc:`section</Survival Analysis intro>`,
@@ -226,7 +230,7 @@ The property is a Pandas DataFrame, so we can call ``plot`` on it:
     kmf.survival_function_.plot()
     plt.title('Survival function of political regimes');
 
-
+.. image:: images/lifelines_intro_kmf_curve.png
    
 
 How do we interpret this? The y-axis represents the probability a leader is still
@@ -244,7 +248,7 @@ to plot both the KM estimate and its confidence intervals:
 
     kmf.plot()
 
-.. image:: Introtolifelines_files/Introtolifelines_15_1.png
+.. image:: images/lifelines_intro_kmf_fitter.png
 
 .. note::  Don't like the shaded area for confidence intervals? See below for examples on how to change this.
 
@@ -283,7 +287,7 @@ an ``axis`` object, that can be used for plotting further estimates:
     plt.title("Lifespans of different global regimes");
 
 
-.. image:: Introtolifelines_files/Introtolifelines_19_0.png
+.. image:: images/lifelines_intro_multi_kmf_fitter.png
 
 
 We might be interested in estimating the probabilities in between some
@@ -315,7 +319,7 @@ probabilties of survival at those points:
     dtype: float64
 
 
-.. image:: Introtolifelines_files/Introtolifelines_21_1.png
+.. image:: images/lifelines_intro_multi_kmf_fitter_2.png
 
 
 It is incredible how much longer these non-democratic regimes exist for.
@@ -374,12 +378,10 @@ Lets compare the different *types* of regimes present in the dataset:
         plt.xlim(0,50)
         if i==0:
             plt.ylabel('Frac. in power after $n$ years')
-        if i == 3:
-            plt.xlabel("Years in power")
     plt.tight_layout()
 
 
-.. image:: Introtolifelines_files/Introtolifelines_25_0.png
+.. image:: images/lifelines_intro_all_regimes.png
 
 
 --------------
@@ -401,7 +403,7 @@ respectively. For example:
 The raw data is not always available in this format -- *lifelines*
 includes some helper functions to transform data formats to *lifelines*
 format. These are located in the ``lifelines.utils`` sublibrary. For
-example, the function ``datetimes_to_durations`` accepts an arrary or
+example, the function ``datetimes_to_durations`` accepts an array or
 Pandas object of start times/dates, and an array or Pandas objects of
 end times/dates (or ``None`` if not observed):
 
@@ -428,8 +430,8 @@ Estimating hazard rates using Nelson-Aalen
 ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
 The survival curve is a great way to summarize and visualize the
-lifetime data, it is not the only way. If we are curious about the hazard function :math:`\lambda(t)` of a
-population, we unfortunatly cannot transform the Kaplan Meier estimate
+lifetime data, however it is not the only way. If we are curious about the hazard function :math:`\lambda(t)` of a
+population, we unfortunately cannot transform the Kaplan Meier estimate
 -- statistics doesn't work quite that well. Fortunately, there is a
 proper estimator of the *cumulative* hazard function:
 
@@ -480,12 +482,12 @@ a DataFrame:
 
 
 
-.. image:: Introtolifelines_files/Introtolifelines_34_1.png
+.. image:: images/lifelines_intro_naf_fitter.png
 
 
 The cumulative hazard has less immediate understanding than the survival
 curve, but the hazard curve is the basis of more advanced techniques in
-survival anaylsis. Recall that we are estimating *cumulative hazard
+survival analysis. Recall that we are estimating *cumulative hazard
 curve*, :math:`\Lambda(t)`. (Why? The sum of estimates is much more
 stable than the point-wise estimates.) Thus we know the *rate of change*
 of this curve is an estimate of the hazard function.
@@ -506,7 +508,7 @@ years:
     plt.title("Cumulative hazard function of different global regimes");
 
 
-.. image:: Introtolifelines_files/Introtolifelines_36_0.png
+.. image:: images/lifelines_intro_naf_fitter_multi.png
 
 
 Looking at the rates of change, I would say that both political
@@ -529,7 +531,7 @@ out the differences of the cumulative hazard curve) , and this requires
 us to specify a bandwidth parameter that controls the amount of
 smoothing. This functionality is provided in the ``smoothed_hazard_``
 and ``hazard_confidence_intervals_`` methods. (Why methods? They require
-an arguement representing the bandwidth).
+an argument representing the bandwidth).
 
 There is also a ``plot_hazard`` function (that also requires a
 ``bandwidth`` keyword) that will plot the estimate plus the confidence
@@ -547,7 +549,7 @@ intervals, similar to the traditional ``plot`` functionality.
     plt.xlim(0,25);
 
 
-.. image:: Introtolifelines_files/Introtolifelines_39_0.png
+.. image:: images/lifelines_intro_naf_smooth_multi.png
 
 
 It is more clear here which group has the higher hazard, and like
@@ -568,7 +570,7 @@ here. (My advice: stick with the cumulative hazard function.)
 
 
 
-.. image:: Introtolifelines_files/Introtolifelines_41_1.png
+.. image:: images/lifelines_intro_naf_smooth_multi_2.png
 
 
 
@@ -580,8 +582,8 @@ Left Censored Data
 
 We've mainly been focusing on *right-censorship*, which describes cases where we do not observe the death event.
 This situation is the most common one. Alternatively, there are situations where we do not observe the *birth* event
-occuring. Consider the case where a doctor sees a delayed onset of symptoms of an underlying disease. The doctor
-is unsure *when* the disease was contracted (birth), but know it was before the discovery. 
+occurring. Consider the case where a doctor sees a delayed onset of symptoms of an underlying disease. The doctor
+is unsure *when* the disease was contracted (birth), but knows it was before the discovery. 
 
 Another situation where we have left censored data is when measurements have only an upperbound, that is, the measurements
 instruments could only detect the measurement was *less* than some upperbound.
@@ -590,23 +592,26 @@ instruments could only detect the measurement was *less* than some upperbound.
 
 .. code:: python
 
-    from lifelines.datasets import generate_lcd_dataset
-    lcd_dataset = generate_lcd_dataset()
+    from lifelines.datasets import load_lcd
+    lcd_dataset = load_lcd()
 
-    T = lcd_dataset['alluvial_fan']['T']
-    C = lcd_dataset['alluvial_fan']['C'] #boolean array, True if observed.
+    ix = lcd_dataset['group'] == 'alluvial_fan'
+    T = lcd_dataset[ix]['T']
+    C = lcd_dataset[ix]['C'] #boolean array, True if observed.
 
     kmf = KaplanMeierFitter()
     kmf.fit(T,C, left_censorship=True)  
 
 Instead of producing a survival function, left-censored data is more interested in the cumulative density function
-of time to birth. This is available as the ``cumulative_density_`` property aftering fitting the data.
+of time to birth. This is available as the ``cumulative_density_`` property after fitting the data.
 
 .. code:: python
     
     kmf.cumulative_density_
     kmf.plot() #will plot the CDF
 
+
+.. image:: images/lifelines_intro_lcd.png
 
 Left Truncated Data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

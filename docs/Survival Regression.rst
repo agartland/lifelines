@@ -1,9 +1,12 @@
+.. image:: http://i.imgur.com/EOowdSD.png
+
+-------------------------------------
 
 Survival Regression
 =====================================
 
 Often we have additional data aside from the durations, and if
-applicable any censorships that occured. In the regime dataset, we have
+applicable any censorships that occurred. In the regime dataset, we have
 the type of government the political leader was part of, the country
 they were head of, and the year they were elected. Can we use this data
 in survival analysis?
@@ -15,7 +18,7 @@ logic in the first part of this tutorial, we cannot use traditional
 methods like linear regression.
 
 There are two popular competing techniques in survival regression: Cox's
-model and Aalen's additive model. Both models attemps to model the
+model and Aalen's additive model. Both models attempt to represent the
 hazard rate :math:`\lambda(t)`. In Cox's model, the relationship is
 defined:
 
@@ -33,7 +36,7 @@ Aalen's Additive model
 
 The estimator to fit unknown coefficients in Aalen's additive model is
 located in ``estimators`` under ``AalenAdditiveFitter``. For this
-exercise, we will use the regime dataset and include the catagorical
+exercise, we will use the regime dataset and include the categorical
 variables ``un_continent_name`` (eg: Asia, North America,...), the
 ``regime`` type (eg: monarchy, civilan,...) and the year the regime
 started in, ``start_year``.
@@ -154,7 +157,7 @@ above). This is important to keep in mind when analzying the output.
 
 
 I'm using the lovely library ``patsy`` <https://github.com/pydata/patsy>`__ here to create a
-covaritate matrix from my original dataframe.
+covariance matrix from my original dataframe.
 
 .. code:: python
 
@@ -186,12 +189,12 @@ covaritate matrix from my original dataframe.
 
 
 Below we create our Fitter class. Since we did not supply an intercept
-column in our patsy we have included the keyword ``fit_intercept=True``
+column in our matrix we have included the keyword ``fit_intercept=True``
 (``True`` by default) which will append the column of ones to our
 matrix. (Sidenote: the intercept term, :math:`b_0(t)` in survival
 regression is often referred to as the *baseline* hazard.)
 
-We have also included the ``penalizer`` option. During the estimation, a
+We have also included the ``coef_penalizer`` option. During the estimation, a
 linear regression is computed at each step. Often the regression can be
 unstable (due to high
 `co-linearity <http://camdp.com/blogs/machine-learning-counter-examples-pt1>`__
@@ -200,10 +203,10 @@ the estimates still appear to be too unstable, try increasing it.
 
 .. code:: python
 
-    aaf = AalenAdditiveFitter(penalizer=1.0, fit_intercept=True)
+    aaf = AalenAdditiveFitter(coef_penalizer=1.0, fit_intercept=True)
 
 Like the API syntax above, an instance of ``AalenAdditiveFitter``
-includes a ``fit`` method that performs the inference on the coefficients. This method accepts a pandas DataFrame: each row is an individual and columns are the covarites and 
+includes a ``fit`` method that performs the inference on the coefficients. This method accepts a pandas DataFrame: each row is an individual and columns are the covariates and 
 two special columns: a *duration* column and a boolean *event occured* column (where event occured refers to the event of interest - expulsion from government in this case)
 
 
@@ -342,7 +345,7 @@ containing the estimates of :math:`\int_0^t b_i(s) \; ds`:
   aaf.plot( columns=[ 'regime[T.Presidential Dem]', 'baseline', 'un_continent_name[Europe]' ], ix=slice(1,15) )
 
 
-.. image:: images/cumulative_hazards_.png
+.. image:: images/survival_regression_aaf.png
 
 
 Regression is most interesting if we use it on data we have not yet
@@ -354,10 +357,9 @@ Prime Minister Stephen Harper.
 
 .. code:: python
 
-    ix = (data['ctryname'] == 'Canada')
-    harper = X[ix,:][-1,:][None,:]
-    harper[0,-1] = 2003
-    print "Harper's unique data point"
+    ix = (data['ctryname'] == 'Canada') * (data['start_year'] == 2006)
+    harper = X.ix[ix]
+    print "Harper's unique data point", harper
 
 .. parsed-literal::
 
@@ -377,13 +379,13 @@ Prime Minister Stephen Harper.
 
     ax = plt.subplot(2,1,1)
 
-    aaf.predict_cumulative_hazard(harper, columns=["Harper's hazard rate"]).plot(ax=ax)
+    aaf.predict_cumulative_hazard(harper).plot(ax=ax)
     ax = plt.subplot(2,1,2)
 
-    aaf.predict_survival_function(harper, columns=["Harper's survival function"]).plot(ax=ax);
+    aaf.predict_survival_function(harper).plot(ax=ax);
 
 
-.. image:: Introtolifelines_files/Introtolifelines_57_2.png
+.. image:: images/survival_regression_harper.png
 
 
 Cox's Proportional Hazard model
@@ -393,7 +395,7 @@ New in 0.4.0 is the implementation of the Propotional Hazard's regression model 
 R under ``coxph``). It has a similar API to Aalen's Additive model. Like R, it has a ``print_summary``
 function that prints a tabuluar view of coefficients and related stats. 
 
-This example data is from the paper `here <http://cran.r-project.org/doc/contrib/Fox-Companion/appendix-cox-regression.pdf>`_.
+This example data is from the paper `here <http://socserv.socsci.mcmaster.ca/jfox/Books/Companion/appendix/Appendix-Cox-Regression.pdf>`_.
 
 .. code:: python
 
@@ -404,7 +406,7 @@ This example data is from the paper `here <http://cran.r-project.org/doc/contrib
     cf = CoxPHFitter()
     cf.fit(rossi_dataset, 'week', event_col='arrest')
 
-    cf.print_summary()
+    cf.print_summary()  # access the results using cf.summary
 
     """
     n=432, number of events=114
@@ -425,6 +427,32 @@ This example data is from the paper `here <http://cran.r-project.org/doc/contrib
 
 To access the coefficients and the baseline hazard, you can use ``cf.hazards_`` and ``cf.baseline_hazard_`` respectively. After fitting, you can use use the suite of prediction methods (similar to Aalen's additve model above): ``.predict_hazard(X)``, ``.predict_survival_function(X)``, etc. 
 
+Stratification
+################
+
+Sometimes a covariate may not obey the proportional hazard assumption. In this case, we can allow a factor to be adjusted for without estimating its effect. To specify categorical variables to be used in stratification, we specify them in the call to ``fit``:
+
+.. code:: python
+
+    cf.fit(rossi_dataset, 'week', event_col='arrest', strata=['race'])
+
+    cf.print_summary()  # access the results using cf.summary
+    """
+    n=432, number of events=114
+
+               coef  exp(coef)  se(coef)          z         p  lower 0.95  upper 0.95
+    fin  -1.890e-01  8.278e-01 9.576e-02 -1.973e+00 4.848e-02  -3.767e-01  -1.218e-03   *
+    age  -3.503e-01  7.045e-01 1.343e-01 -2.608e+00 9.106e-03  -6.137e-01  -8.700e-02  **
+    wexp -7.107e-02  9.314e-01 1.053e-01 -6.746e-01 4.999e-01  -2.776e-01   1.355e-01
+    mar  -1.452e-01  8.649e-01 1.255e-01 -1.157e+00 2.473e-01  -3.911e-01   1.008e-01
+    paro -4.079e-02  9.600e-01 9.524e-02 -4.283e-01 6.684e-01  -2.275e-01   1.459e-01
+    prio  2.661e-01  1.305e+00 8.319e-02  3.198e+00 1.381e-03   1.030e-01   4.292e-01  **
+    ---
+    Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+    Concordance = 0.638
+    """
+
 Model Selection in Survival Regression
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -437,7 +465,7 @@ of AUC, another common loss function, and is interpretted similarly:
 * 1.0 is perfect concordance and,
 * 0.0 is perfect anti-concordance (multiply predictions with -1 to get 1.0)
 
-The measure is implemented in lifelines under `lifelines.statsitics.concordance_index` and accepts the actual times (along with any censorships), and the predicted times.
+The measure is implemented in lifelines under `lifelines.utils.concordance_index` and accepts the actual times (along with any censorships), and the predicted times.
 
 Cross Validation
 ######################################
@@ -455,8 +483,8 @@ into a training set and a testing set, fits itself on the training set, and eval
         cf = CoxPHFitter()
         scores = k_fold_cross_validation(cf, regression_dataset, 'T', event_col='E', k=3)
         print scores
-        print scores.mean()
-        print scores.std()
+        print np.mean(scores)
+        print np.std(scores)
         
         #[ 0.5896  0.5358  0.5028]
         # 0.542

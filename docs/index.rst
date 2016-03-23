@@ -3,18 +3,23 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-lifelines
+.. image:: http://i.imgur.com/EOowdSD.png
+
+-------------------------------------
+
+
+Lifelines
 =====================================
 
 *lifelines* is a implementation of survival analysis in Python. What
 benefits does *lifelines* offer over other survival analysis
 implementations?
 
--  built ontop of Pandas
+-  built on top of Pandas
 -  internal plotting methods
 -  simple and intuitive API (*designed for humans*)
 -  only does survival analysis (No unnecessary features or second-class
-   implentations)
+   implementations)
 
 
 Contents:

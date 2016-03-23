@@ -1,5 +1,10 @@
 .. _code_directive:
 
+.. image:: http://i.imgur.com/EOowdSD.png
+
+-------------------------------------
+
+
 Quickstart
 '''''''''''''''''''''''''''''''''''''''
 
@@ -89,7 +94,7 @@ Similar functionality exists for the ``NelsonAalenFitter``:
 
 but instead of a ``survival_function_`` being exposed, a ``cumulative_hazard_`` is. 
 
-.. note:: Similar to Scikit-Learn, all statistically estimated quanities append an underscore to the property name. 
+.. note:: Similar to Scikit-Learn, all statistically estimated quantities append an underscore to the property name. 
 
 Getting Data in The Right Format
 ---------------------------------
@@ -107,6 +112,27 @@ Lifelines has some utility functions to transform this dataset into durations an
     # start_times is a vector of datetime objects
     # end_times is a vector of (possibly missing) datetime objects. 
     T, C = datetimes_to_durations(start_times, end_times, freq='h')
+
+
+Alternatively, perhaps you are interested in viewing the survival table given some durations and censorship vectors.
+
+
+.. code:: python
+    
+    from lifelines.utils import survival_table_from_events
+
+    table = survival_table_from_events(T, E)
+    print table.head()
+
+    """
+              removed  observed  censored  entrance  at_risk
+    event_at
+    0               0         0         0       163      163
+    6               1         1         0         0      163
+    7               2         1         1         0      162
+    9               3         3         0         0      160
+    13              3         3         0         0      157
+    """
 
 
 Survival Regression
@@ -146,6 +172,7 @@ After fitting, you'll have access to properties like ``cumulative_hazards_`` and
     x = regression_dataset[regression_dataset.columns - ['E','T']]
     aaf.predict_survival_function(x.ix[10:12]).plot() #get the unique survival functions of the first two subjects 
 
+.. image:: images/quickstart_predict_aaf.png  
 
 Like the above estimators, there is also a built-in plotting method:
 

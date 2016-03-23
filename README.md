@@ -1,8 +1,8 @@
-lifelines
-===========
+![logo](http://i.imgur.com/EOowdSD.png)
 
-[![Latest Version](https://pypip.in/v/lifelines/badge.png)](https://pypi.python.org/pypi/lifelines/)
+[![PyPI version](https://badge.fury.io/py/lifelines.svg)](https://badge.fury.io/py/lifelines)
 [![Build Status](https://travis-ci.org/CamDavidsonPilon/lifelines.svg?branch=master)](https://travis-ci.org/CamDavidsonPilon/lifelines)
+[![Coverage Status](https://coveralls.io/repos/github/CamDavidsonPilon/lifelines/badge.svg?branch=master)](https://coveralls.io/github/CamDavidsonPilon/lifelines?branch=master)
 
 [What is survival analysis and why should I learn it?](http://lifelines.readthedocs.org/en/latest/Survival%20Analysis%20intro.html)
  Survival analysis was originally developed and applied heavily by the actuarial and medical community. Its purpose was to answer *why do events occur now versus later* under uncertainty (where *events* might refer to deaths, disease remission, etc.). This is great for researchers who are interested in measuring lifetimes: they can answer questions like *what factors might influence deaths?*
@@ -32,14 +32,17 @@ Or getting the bleeding edge version with:
 
        pip install --upgrade --no-deps git+https://github.com/CamDavidsonPilon/lifelines.git
 
-
 from the command line.
+
+##### Installation Issues?
+
+See the common [problems/solutions for installing lifelines](https://github.com/CamDavidsonPilon/lifelines/issues?utf8=%E2%9C%93&q=label%3Ainstallation+).
 
 #### Running the tests
 
 You can optionally run the test suite after install with
 
-    python -m lifelines.tests
+    py.test
 
 
 ### *lifelines* Documentation and an Intro to Survival Analysis
@@ -50,7 +53,7 @@ please check out the [Documentation and Tutorials page](http://lifelines.readthe
 
 ### Citing lifelines
 
- - Davidson-Pilon, C., Lifelines, (2015), Github repository, https://github.com/CamDavidsonPilon/lifelines 
+ - Davidson-Pilon, C., Lifelines, (2016), Github repository, https://github.com/CamDavidsonPilon/lifelines 
  
 or with bibTex here: 
 
@@ -58,11 +61,11 @@ or with bibTex here:
 @misc{Lifelines,
   author = {C., Davidson-Pilon},
   title = {Lifelines},
-  year = {2015},
+  year = {2016},
   publisher = {GitHub},
   journal = {GitHub repository},
   howpublished = {\url{https://github.com/camdavidsonpilon/lifelines}},
-  commit = {63fc4f0ada0c61248957a478f3544efb4eeb2ccf}
+  commit = {latest_commit}
 }
 ```
 ![lifelines](http://i.imgur.com/QXW71zA.png)

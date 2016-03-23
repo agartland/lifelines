@@ -2,7 +2,7 @@
 from __future__ import print_function
 
 import numpy as np
-from lifelines.utils import coalesce
+from .utils import coalesce
 
 
 def is_latex_enabled():
@@ -169,7 +169,7 @@ def add_at_risk_counts(*fitters, **kwargs):
 
 
 def plot_lifetimes(lifetimes, event_observed=None, birthtimes=None,
-                   order=False):
+                   order=False, block=True):
     """
     Parameters:
       lifetimes: an (n,) numpy array of lifetimes.
@@ -207,65 +207,38 @@ def plot_lifetimes(lifetimes, event_observed=None, birthtimes=None,
         plt.scatter((birthtimes[i]) + lifetimes[i], N - 1 - i, color=c, s=30, marker=m)
 
     plt.ylim(-0.5, N)
-    plt.show()
+    plt.show(block=block)
     return
 
 
-def shaded_plot(x, y, y_upper, y_lower, **kwargs):
+def set_kwargs_ax(kwargs):
     from matplotlib import pyplot as plt
+    if "ax" not in kwargs:
+        kwargs["ax"] = plt.figure().add_subplot(111)
 
-    ax = kwargs.pop('ax', plt.gca())
-    base_line, = ax.plot(x, y, drawstyle='steps-post', **kwargs)
-    fill_between_steps(x, y_lower, y2=y_upper, ax=ax, alpha=0.25,
-                       color=base_line.get_color(), linewidth=1.0)
-    return
+def set_kwargs_color(kwargs):
+    import matplotlib as mpl
+    if int(mpl.__version__.split('.')[1]) > 4:
+        # https://github.com/CamDavidsonPilon/lifelines/issues/191#issuecomment-145275656
+        kwargs['color'] = coalesce(kwargs.get('c'), kwargs.get('color'),
+                                   next(kwargs["ax"]._get_lines.prop_cycler)['color'])
+    else:
+        kwargs['color'] = coalesce(kwargs.get('c'), kwargs.get('color'),
+                                   next(kwargs["ax"]._get_lines.color_cycle))
 
-
-def plot_regressions(self):
-    def plot(ix=None, iloc=None, columns=[], legend=True, **kwargs):
-        """"
-        A wrapper around plotting. Matplotlib plot arguments can be passed in, plus:
-
-          ix: specify a time-based subsection of the curves to plot, ex:
-                   .plot(ix=slice(0.,10.)) will plot the time values between t=0. and t=10.
-          iloc: specify a location-based subsection of the curves to plot, ex:
-                   .plot(iloc=slice(0,10)) will plot the first 10 time points.
-          columns: If not empty, plot a subset of columns from the cumulative_hazards_. Default all.
-          legend: show legend in figure.
-
-        """
-        from matplotlib import pyplot as plt
-
-        assert (ix is None or iloc is None), 'Cannot set both ix and iloc in call to .plot'
-
-        get_method = "ix" if ix is not None else "iloc"
-        if iloc == ix is None:
-            user_submitted_ix = slice(0, None)
-        else:
-            user_submitted_ix = ix if ix is not None else iloc
-        get_loc = lambda df: getattr(df, get_method)[user_submitted_ix]
-
-        if len(columns) == 0:
-            columns = self.cumulative_hazards_.columns
-
-        if "ax" not in kwargs:
-            kwargs["ax"] = plt.figure().add_subplot(111)
-
-        x = get_loc(self.cumulative_hazards_).index.values.astype(float)
-        for column in columns:
-            y = get_loc(self.cumulative_hazards_[column]).values
-            y_upper = get_loc(self.confidence_intervals_[column].ix['upper']).values
-            y_lower = get_loc(self.confidence_intervals_[column].ix['lower']).values
-            shaded_plot(x, y, y_upper, y_lower, ax=kwargs["ax"], label=coalesce(kwargs.get('label'), column))
-
-        if legend:
-            kwargs["ax"].legend()
-
-        return kwargs["ax"]
-    return plot
+def set_kwargs_drawstyle(kwargs):
+    kwargs['drawstyle'] = kwargs.get('drawstyle', 'steps-post')
 
 
-def plot_estimate(self, estimate):
+def create_dataframe_slicer(iloc, ix):
+    user_did_not_specify_certain_indexes = (iloc is None) and (ix is None)
+    user_submitted_slice = slice(None) if user_did_not_specify_certain_indexes else coalesce(ix, iloc)
+
+    get_method = "ix" if ix is not None else "iloc"
+    return lambda df: getattr(df, get_method)[user_submitted_slice]
+
+
+def plot_estimate(cls, estimate):
     doc_string = """"
         Plots a pretty version of the fitted %s.
 
@@ -309,14 +282,12 @@ def plot_estimate(self, estimate):
         if censor_styles is None:
             censor_styles = {}
 
-        if (ix is not None and iloc is not None):
+        if (ix is not None) and (iloc is not None):
             raise ValueError('Cannot set both ix and iloc in call to .plot().')
 
-        if "ax" not in kwargs:
-            kwargs["ax"] = plt.figure().add_subplot(111)
-        kwargs['color'] = coalesce(kwargs.get('c'), kwargs.get('color'),
-                                   next(kwargs["ax"]._get_lines.color_cycle))
-        kwargs['drawstyle'] = coalesce(kwargs.get('drawstyle'), 'steps-post')
+        set_kwargs_ax(kwargs)
+        set_kwargs_color(kwargs)
+        set_kwargs_drawstyle(kwargs)
 
         # R-style graphics
         if flat:
@@ -325,56 +296,56 @@ def plot_estimate(self, estimate):
 
         if estimate == "hazard_":
             if bandwidth is None:
-                raise ValueError('Must specify a bandwidth parameter in the ' +
-                                 'call to plot_hazard.')
-            estimate_ = self.smoothed_hazard_(bandwidth)
+                raise ValueError('Must specify a bandwidth parameter in the call to plot_hazard.')
+            estimate_ = cls.smoothed_hazard_(bandwidth)
             confidence_interval_ = \
-                self.smoothed_hazard_confidence_intervals_(bandwidth,
-                                                           hazard_=estimate_.values[:, 0])
+                cls.smoothed_hazard_confidence_intervals_(bandwidth, hazard_=estimate_.values[:, 0])
         else:
-            confidence_interval_ = getattr(self, 'confidence_interval_')
-            estimate_ = getattr(self, estimate)
+            estimate_ = getattr(cls, estimate)
+            confidence_interval_ = getattr(cls, 'confidence_interval_')
 
-        # did user specify certain indexes or locations?
-        if iloc == ix is None:
-            user_submitted_ix = slice(None)
-        else:
-            user_submitted_ix = ix if ix is not None else iloc
 
-        get_method = "ix" if ix is not None else "iloc"
-        get_loc = lambda df: getattr(df, get_method)[user_submitted_ix]
+        dataframe_slicer = create_dataframe_slicer(iloc, ix)
 
         # plot censors
-        if show_censors and self.event_table['censored'].sum() > 0:
-            cs = {'marker': '+', 'ms': 12, 'mew': 1}
+        ax = kwargs['ax']
+        colour = kwargs['color']
+
+        if show_censors and cls.event_table['censored'].sum() > 0:
+            cs = {
+                'marker': '+', 
+                'ms': 12, 
+                'mew': 1
+            }
             cs.update(censor_styles)
-            times = get_loc(self.event_table.ix[(self.event_table['censored'] > 0)]).index.values.astype(float)
-            v = self.predict(times)
-            kwargs['ax'].plot(times, v, linestyle='None',
-                              color=kwargs['color'], **cs)
+            times = dataframe_slicer(cls.event_table.ix[(cls.event_table['censored'] > 0)]).index.values.astype(float)
+            v = cls.predict(times)
+            ax.plot(times, v, linestyle='None',
+                              color=colour, **cs)
 
         # plot estimate
-        get_loc(estimate_).plot(**kwargs)
+        dataframe_slicer(estimate_).plot(**kwargs)
 
         # plot confidence intervals
         if ci_show:
             if ci_force_lines:
-                get_loc(confidence_interval_).plot(linestyle="-", linewidth=1,
-                                                   c=kwargs['color'], legend=True,
+                dataframe_slicer(confidence_interval_).plot(linestyle="-", linewidth=1,
+                                                   color=[colour], legend=True,
                                                    drawstyle=kwargs.get('drawstyle', 'default'),
-                                                   ax=kwargs['ax'], alpha=0.6)
+                                                   ax=ax, alpha=0.6)
             else:
-                x = get_loc(confidence_interval_).index.values.astype(float)
-                lower = get_loc(confidence_interval_.filter(like='lower')).values[:, 0]
-                upper = get_loc(confidence_interval_.filter(like='upper')).values[:, 0]
-                fill_between_steps(x, lower, y2=upper, ax=kwargs['ax'],
-                                   alpha=ci_alpha, color=kwargs['color'],
+                x = dataframe_slicer(confidence_interval_).index.values.astype(float)
+                lower = dataframe_slicer(confidence_interval_.filter(like='lower')).values[:, 0]
+                upper = dataframe_slicer(confidence_interval_.filter(like='upper')).values[:, 0]
+                fill_between_steps(x, lower, y2=upper, ax=ax,
+                                   alpha=ci_alpha, color=colour,
                                    linewidth=1.0)
 
         if at_risk_counts:
-            add_at_risk_counts(self, ax=kwargs['ax'])
+            add_at_risk_counts(cls, ax=ax)
 
-        return kwargs['ax']
+        return ax
+
     plot.__doc__ = doc_string
     return plot
 

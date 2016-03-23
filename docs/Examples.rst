@@ -1,3 +1,7 @@
+.. image:: http://i.imgur.com/EOowdSD.png
+
+-------------------------------------
+
 More Examples and Recipes
 ==================================
 
@@ -76,13 +80,13 @@ If using *lifelines* for prediction work, it's ideal that you perform some sort 
     df = load_regression_dataset()
 
     #create the three models we'd like to compare.
-    aaf_1 = AalenAdditiveFitter(penalizer=0.5)
-    aaf_2 = AalenAdditiveFitter(penalizer=10)
+    aaf_1 = AalenAdditiveFitter(coef_penalizer=0.5)
+    aaf_2 = AalenAdditiveFitter(coef_penalizer=10)
     cph = CoxPHFitter() 
 
-    print k_fold_cross_validation(cph, df, duration_col='T', event_col='E').mean()
-    print k_fold_cross_validation(aaf_1, df, duration_col='T', event_col='E').mean()
-    print k_fold_cross_validation(aaf_2, df, duration_col='T', event_col='E').mean()
+    print np.mean(k_fold_cross_validation(cph, df, duration_col='T', event_col='E'))
+    print np.mean(k_fold_cross_validation(aaf_1, df, duration_col='T', event_col='E'))
+    print np.mean(k_fold_cross_validation(aaf_2, df, duration_col='T', event_col='E'))
 
 From these results, Aalen's Additive model with a penalizer of 10 is best model of predicting future survival times.
 
@@ -150,6 +154,27 @@ time (months, days, ...)      observed deaths       censored
     T,C = survival_events_from_table(df, observed_deaths_col='observed deaths', censored_col='censored')
     print T # np.array([0,0,0,0,0,0,0,1,2,2, ...])
     print C # np.array([1,1,1,1,1,1,1,0,1,1, ...])
+
+
+Alternatively, perhaps you are interested in viewing the survival table given some durations and censorship vectors.
+
+
+.. code:: python
+    
+    from lifelines.utils import survival_table_from_events
+
+    table = survival_table_from_events(T, C)
+    print table.head()
+    
+    """
+              removed  observed  censored  entrance  at_risk
+    event_at
+    0               0         0         0        60       60
+    2               2         1         1         0       60
+    3               3         1         2         0       58
+    4               5         3         2         0       55
+    5              12         6         6         0       50
+    """
 
 
 
@@ -337,10 +362,10 @@ Below is a way to get an example dataset from a relational database (this may va
       (ended_at IS NOT NULL) AS "C" 
     FROM some_tables
 
-Explaination
+Explanation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Each row is an `id`, a duration, and a boolean indicating whether the event occured or not. Recall that we denote a 
+Each row is an `id`, a duration, and a boolean indicating whether the event occurred or not. Recall that we denote a 
 "True" if the event *did* occur, that is, `ended_at` is filled in (we observed the `ended_at`). Ex: 
 
 ==================   ============   ============
