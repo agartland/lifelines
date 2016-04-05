@@ -45,8 +45,10 @@ class UnivariateFitter(BaseFitter):
             other_estimate = getattr(other, estimate)
             new_index = np.concatenate((other_estimate.index, self_estimate.index))
             new_index = np.unique(new_index)
-            return self_estimate.reindex(new_index, method='ffill') - \
-                other_estimate.reindex(new_index, method='ffill')
+
+            out = self_estimate.reindex(new_index, method='ffill') - \
+                  other_estimate.reindex(new_index, method='ffill')
+            return pd.Series(out.squeeze(), index=new_index, name='difference')
 
         subtract.__doc__ = doc_string
         return subtract
