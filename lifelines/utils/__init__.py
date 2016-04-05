@@ -186,14 +186,14 @@ def survival_table_from_events(death_times, event_observed, birth_times=None,
 
     # deal with deaths and censorships
     df = pd.DataFrame(death_times, columns=["event_at"])
-    df[removed] = 1 if weights is None else weights
-    df[observed] = np.asarray(event_observed)
+    df[removed] = weights
+    df[observed] = np.asarray(event_observed) * weights
     death_table = df.groupby("event_at").sum()
     death_table[censored] = (death_table[removed] - death_table[observed]).astype(int)
 
     # deal with late births
     births = pd.DataFrame(birth_times, columns=['event_at'])
-    births[entrance] = 1
+    births[entrance] = weights
     births_table = births.groupby('event_at').sum()
 
     event_table = death_table.join(births_table, how='outer', sort=True).fillna(0)  # http://wesmckinney.com/blog/?p=414
@@ -606,7 +606,7 @@ def _additive_estimate(events, timeline, _additive_f, _additive_var, reverse):
     return estimate_, var_
 
 
-def _preprocess_inputs(durations, event_observed, timeline, entry):
+def _preprocess_inputs(durations, event_observed, timeline, entry, weights=None):
     """
     Cleans and confirms input to what lifelines expects downstream
     """
@@ -623,7 +623,12 @@ def _preprocess_inputs(durations, event_observed, timeline, entry):
     if entry is not None:
         entry = np.asarray(entry).reshape((n,))
 
-    event_table = survival_table_from_events(durations, event_observed, entry)
+    if weights is None:
+        weights = np.ones(n, dtype=float)
+    else:
+        weights = np.asarray(weights).reshape((n,))
+
+    event_table = survival_table_from_events(durations, event_observed, entry, weights=weights)
     if timeline is None:
         timeline = event_table.index.values
     else:

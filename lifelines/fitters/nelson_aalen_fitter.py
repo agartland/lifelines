@@ -35,7 +35,7 @@ class NelsonAalenFitter(UnivariateFitter):
             self._additive_f = self._additive_f_discrete
 
     def fit(self, durations, event_observed=None, timeline=None, entry=None,
-            label='NA_estimate', alpha=None, ci_labels=None):
+            label='NA_estimate', alpha=None, ci_labels=None, weights=None):
         """
         Parameters:
           duration: an array, or pd.Series, of length n -- duration subject was observed for
@@ -50,13 +50,14 @@ class NelsonAalenFitter(UnivariateFitter):
              alpha for this call to fit only.
           ci_labels: add custom column names to the generated confidence intervals
                 as a length-2 list: [<lower-bound name>, <upper-bound name>]. Default: <label>_lower_<alpha>
+          weights: an array of length n -- weight for each subject
 
         Returns:
           self, with new properties like 'cumulative_hazard_'.
 
         """
 
-        v = _preprocess_inputs(durations, event_observed, timeline, entry)
+        v = _preprocess_inputs(durations, event_observed, timeline, entry, weights)
         self.durations, self.event_observed, self.timeline, self.entry, self.event_table = v
 
         cumulative_hazard_, cumulative_sq_ = _additive_estimate(self.event_table, self.timeline,

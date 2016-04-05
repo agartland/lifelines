@@ -20,7 +20,7 @@ class KaplanMeierFitter(UnivariateFitter):
     """
 
     def fit(self, durations, event_observed=None, timeline=None, entry=None, label='KM_estimate',
-            alpha=None, left_censorship=False, ci_labels=None):
+            alpha=None, left_censorship=False, ci_labels=None, weights=None):
         """
         Parameters:
           duration: an array, or pd.Series, of length n -- duration subject was observed for
@@ -36,6 +36,8 @@ class KaplanMeierFitter(UnivariateFitter):
           left_censorship: True if durations and event_observed refer to left censorship events. Default False
           ci_labels: add custom column names to the generated confidence intervals
                 as a length-2 list: [<lower-bound name>, <upper-bound name>]. Default: <label>_lower_<alpha>
+          weights: an array of length n -- weight for each subject
+
 
 
         Returns:
@@ -44,7 +46,7 @@ class KaplanMeierFitter(UnivariateFitter):
         """
         # if the user is interested in left-censorship, we return the cumulative_density_, no survival_function_,
         estimate_name = 'survival_function_' if not left_censorship else 'cumulative_density_'
-        v = _preprocess_inputs(durations, event_observed, timeline, entry)
+        v = _preprocess_inputs(durations, event_observed, timeline, entry, weights)
         self.durations, self.event_observed, self.timeline, self.entry, self.event_table = v
         self._label = label
         alpha = alpha if alpha else self.alpha
