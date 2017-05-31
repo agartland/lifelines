@@ -17,7 +17,7 @@ For this example, we will be investigating the lifetimes of political
 leaders around the world. A political leader in this case is defined by a single
 individual's time in office who controls the ruling regime. This could be an
 elected president, unelected dictator, monarch, etc. The birth event is
-the start of the individual's tenor, and the death event is the retirement of the
+the start of the individual's tenure, and the death event is the retirement of the
 individual. Censorship can occur if they are a) still in offices at the
 time of dataset complilation (2008), or b) die while in office (this
 includes assassinations).
@@ -55,7 +55,7 @@ Let's bring in our dataset.
 
 .. code:: python
 
-    data.head()
+    data.sample(10)
     #the boolean columns `observed` refers to whether the death (leaving office)
     #was observed or not.
 
@@ -84,88 +84,163 @@ Let's bring in our dataset.
       </thead>
       <tbody>
         <tr>
-          <th>1</th>
-          <td> Afghanistan</td>
-          <td> 700</td>
-          <td> 700</td>
-          <td> Southern Asia</td>
-          <td> Asia</td>
-          <td>   Mohammad Zahir Shah</td>
-          <td> Mohammad Zahir Shah.Afghanistan.1946.1952.Mona...</td>
-          <td> Non-democracy</td>
-          <td>      Monarchy</td>
-          <td> 1946</td>
-          <td>  7</td>
-          <td> 1</td>
+          <th>164</th>
+          <td>Bolivia</td>
+          <td>145</td>
+          <td>145.0</td>
+          <td>South America</td>
+          <td>Americas</td>
+          <td>Rene Barrientos Ortuno</td>
+          <td>Rene Barrientos Ortuno.Bolivia.1966.1968.Milit...</td>
+          <td>Non-democracy</td>
+          <td>Military Dict</td>
+          <td>1966</td>
+          <td>3</td>
+          <td>0</td>
         </tr>
         <tr>
-          <th>2</th>
-          <td> Afghanistan</td>
-          <td> 700</td>
-          <td> 700</td>
-          <td> Southern Asia</td>
-          <td> Asia</td>
-          <td> Sardar Mohammad Daoud</td>
-          <td> Sardar Mohammad Daoud.Afghanistan.1953.1962.Ci...</td>
-          <td> Non-democracy</td>
-          <td> Civilian Dict</td>
-          <td> 1953</td>
-          <td> 10</td>
-          <td> 1</td>
+          <th>740</th>
+          <td>India</td>
+          <td>750</td>
+          <td>750.0</td>
+          <td>Southern Asia</td>
+          <td>Asia</td>
+          <td>Chandra Shekhar</td>
+          <td>Chandra Shekhar.India.1990.1990.Parliamentary Dem</td>
+          <td>Democracy</td>
+          <td>Parliamentary Dem</td>
+          <td>1990</td>
+          <td>1</td>
+          <td>1</td>
         </tr>
         <tr>
-          <th>3</th>
-          <td> Afghanistan</td>
-          <td> 700</td>
-          <td> 700</td>
-          <td> Southern Asia</td>
-          <td> Asia</td>
-          <td>   Mohammad Zahir Shah</td>
-          <td> Mohammad Zahir Shah.Afghanistan.1963.1972.Mona...</td>
-          <td> Non-democracy</td>
-          <td>      Monarchy</td>
-          <td> 1963</td>
-          <td> 10</td>
-          <td> 1</td>
+          <th>220</th>
+          <td>Bulgaria</td>
+          <td>355</td>
+          <td>355.0</td>
+          <td>Eastern Europe</td>
+          <td>Europe</td>
+          <td>Todor Zhivkov</td>
+          <td>Todor Zhivkov.Bulgaria.1954.1988.Civilian Dict</td>
+          <td>Non-democracy</td>
+          <td>Civilian Dict</td>
+          <td>1954</td>
+          <td>35</td>
+          <td>1</td>
         </tr>
         <tr>
-          <th>4</th>
-          <td> Afghanistan</td>
-          <td> 700</td>
-          <td> 700</td>
-          <td> Southern Asia</td>
-          <td> Asia</td>
-          <td> Sardar Mohammad Daoud</td>
-          <td> Sardar Mohammad Daoud.Afghanistan.1973.1977.Ci...</td>
-          <td> Non-democracy</td>
-          <td> Civilian Dict</td>
-          <td> 1973</td>
-          <td>  5</td>
-          <td> 0</td>
+          <th>772</th>
+          <td>Ireland</td>
+          <td>205</td>
+          <td>205.0</td>
+          <td>Northern Europe</td>
+          <td>Europe</td>
+          <td>Charles Haughey</td>
+          <td>Charles Haughey.Ireland.1979.1980.Mixed Dem</td>
+          <td>Democracy</td>
+          <td>Mixed Dem</td>
+          <td>1979</td>
+          <td>2</td>
+          <td>1</td>
         </tr>
         <tr>
-          <th>5</th>
-          <td> Afghanistan</td>
-          <td> 700</td>
-          <td> 700</td>
-          <td> Southern Asia</td>
-          <td> Asia</td>
-          <td>   Nur Mohammad Taraki</td>
-          <td> Nur Mohammad Taraki.Afghanistan.1978.1978.Civi...</td>
-          <td> Non-democracy</td>
-          <td> Civilian Dict</td>
-          <td> 1978</td>
-          <td>  1</td>
-          <td> 0</td>
+          <th>1718</th>
+          <td>United States of America</td>
+          <td>2</td>
+          <td>2.0</td>
+          <td>Northern America</td>
+          <td>Americas</td>
+          <td>Gerald Ford</td>
+          <td>Gerald Ford.United States of America.1974.1976...</td>
+          <td>Democracy</td>
+          <td>Presidential Dem</td>
+          <td>1974</td>
+          <td>3</td>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>712</th>
+          <td>Iceland</td>
+          <td>395</td>
+          <td>395.0</td>
+          <td>Northern Europe</td>
+          <td>Europe</td>
+          <td>Stefan Stefansson</td>
+          <td>Stefan Stefansson.Iceland.1947.1948.Mixed Dem</td>
+          <td>Democracy</td>
+          <td>Mixed Dem</td>
+          <td>1947</td>
+          <td>2</td>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>804</th>
+          <td>Italy</td>
+          <td>325</td>
+          <td>325.0</td>
+          <td>Southern Europe</td>
+          <td>Europe</td>
+          <td>Mariano Rumor</td>
+          <td>Mariano Rumor.Italy.1968.1969.Parliamentary Dem</td>
+          <td>Democracy</td>
+          <td>Parliamentary Dem</td>
+          <td>1968</td>
+          <td>2</td>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>746</th>
+          <td>Indonesia</td>
+          <td>850</td>
+          <td>850.0</td>
+          <td>South-Eastern Asia</td>
+          <td>Asia</td>
+          <td>Sukarno</td>
+          <td>Sukarno.Indonesia.1949.1965.Civilian Dict</td>
+          <td>Non-democracy</td>
+          <td>Civilian Dict</td>
+          <td>1949</td>
+          <td>17</td>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>35</th>
+          <td>Argentina</td>
+          <td>160</td>
+          <td>160.0</td>
+          <td>South America</td>
+          <td>Americas</td>
+          <td>Pedro Eugenio Aramburu Cilveti</td>
+          <td>Pedro Eugenio Aramburu Cilveti.Argentina.1955....</td>
+          <td>Non-democracy</td>
+          <td>Military Dict</td>
+          <td>1955</td>
+          <td>3</td>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>398</th>
+          <td>Democratic Republic of the Congo (Zaire, Congo...</td>
+          <td>490</td>
+          <td>490.0</td>
+          <td>Middle Africa</td>
+          <td>Africa</td>
+          <td>Joseph Kasabuvu</td>
+          <td>Joseph Kasabuvu.Democratic Republic of the Con...</td>
+          <td>Non-democracy</td>
+          <td>Civilian Dict</td>
+          <td>1960</td>
+          <td>5</td>
+          <td>1</td>
         </tr>
       </tbody>
     </table>
-    <p>5 rows × 12 columns</p>
+    <p>10 rows × 12 columns</p>
     </div>
 
 
 
-From the ``1ifelines`` library, we'll need the
+From the ``lifelines`` library, we'll need the
 ``KaplanMeierFitter`` for this exercise:
 
 .. code:: python
@@ -333,7 +408,7 @@ leader rarely makes it past 10 years, and then have a very short
 lifetime past that.
 
 Here the difference between survival functions is very obvious, and
-performing a statistical test seems pendantic. If the curves are more
+performing a statistical test seems pedantic. If the curves are more
 similar, or we possess less data, we may be interested in performing a
 statistical test. In this case, *lifelines* contains routines in
 ``lifelines.statistics`` to compare two survival curves. Below we
@@ -522,7 +597,7 @@ Smoothing the hazard curve
 
 Interpretation of the cumulative hazard function can be difficult -- it
 is not how we usually interpret functions. (On the other hand, most
-survival analysis is done using the cumulative hazard fuction, so understanding
+survival analysis is done using the cumulative hazard function, so understanding
 it is recommended).
 
 Alternatively, we can derive the more-interpretable hazard curve, but
@@ -544,7 +619,7 @@ intervals, similar to the traditional ``plot`` functionality.
     ax = naf.plot_hazard(bandwidth=b)
     naf.fit(T[~dem], event_observed=C[~dem], label="Non-democratic Regimes")
     naf.plot_hazard(ax=ax, bandwidth=b)
-    plt.title("Hazard function of different global regimes | bandwith=%.1f"%b);
+    plt.title("Hazard function of different global regimes | bandwidth=%.1f"%b);
     plt.ylim(0,0.4)
     plt.xlim(0,25);
 
@@ -555,8 +630,8 @@ intervals, similar to the traditional ``plot`` functionality.
 It is more clear here which group has the higher hazard, and like
 hypothesized above, both hazard rates are close to being constant.
 
-There is no obvious way to choose a bandwith, and different
-bandwidth can produce different inferences, so best to be very careful
+There is no obvious way to choose a bandwidth, and different
+bandwidths can produce different inferences, so best to be very careful
 here. (My advice: stick with the cumulative hazard function.)
 
 .. code:: python
@@ -566,7 +641,7 @@ here. (My advice: stick with the cumulative hazard function.)
     ax = naf.plot_hazard(bandwidth=b)
     naf.fit(T[~dem], event_observed=C[~dem], label="Non-democratic Regimes")
     naf.plot_hazard(ax=ax, bandwidth=b)
-    plt.title("Hazard function of different global regimes | bandwith=%.1f"%b);
+    plt.title("Hazard function of different global regimes | bandwidth=%.1f"%b);
 
 
 
@@ -607,7 +682,7 @@ of time to birth. This is available as the ``cumulative_density_`` property afte
 
 .. code:: python
     
-    kmf.cumulative_density_
+    print kmf.cumulative_density_
     kmf.plot() #will plot the CDF
 
 
@@ -617,7 +692,7 @@ Left Truncated Data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Another form of bias that can be introduced into a dataset is called left-truncation. (Also a form of censorship). 
-This occurs when individuals may die even before ever entrying into the study. Both  ``KaplanMeierFitter`` and ``NelsonAalenFitter`` have an optional arugment for ``entry``, which is an array of equal size to the duration array.
+This occurs when individuals may die even before ever entering into the study. Both  ``KaplanMeierFitter`` and ``NelsonAalenFitter`` have an optional arugment for ``entry``, which is an array of equal size to the duration array.
 It describes the offset from birth to entering the study. This is also useful when subjects enter the study at different
 points in their lifetime. For example, if you are measuring time to death of prisoners in 
 prison, the prisoners will enter the study at different ages. 

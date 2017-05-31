@@ -1,6 +1,8 @@
 from __future__ import print_function
 from collections import Counter, Iterable
 import os
+import warnings
+from itertools import combinations
 
 try:
     from StringIO import StringIO as stringio, StringIO
@@ -11,8 +13,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-
-
 from pandas.util.testing import assert_frame_equal, assert_series_equal
 import numpy.testing as npt
 
@@ -20,7 +20,7 @@ from lifelines.utils import k_fold_cross_validation, StatError
 from lifelines.estimation import CoxPHFitter, AalenAdditiveFitter, KaplanMeierFitter, \
     NelsonAalenFitter, BreslowFlemingHarringtonFitter, ExponentialFitter, \
     WeibullFitter, BaseFitter
-from lifelines.datasets import load_regression_dataset, load_larynx, load_waltons, load_kidney_transplant, load_rossi,\
+from lifelines.datasets import load_larynx, load_waltons, load_kidney_transplant, load_rossi,\
     load_lcd, load_panel_test, load_g3, load_holly_molly_polly
 from lifelines.generate_datasets import generate_hazard_rates, generate_random_lifetimes, cumulative_integral
 from lifelines.utils import concordance_index
@@ -521,79 +521,61 @@ class TestBreslowFlemingHarringtonFitter():
 
 class TestRegressionFitters():
 
-    def test_pickle(self, rossi):
+    @pytest.fixture
+    def regression_models(self):
+        return [CoxPHFitter(), AalenAdditiveFitter(), CoxPHFitter(strata=['race', 'paro', 'mar', 'wexp'])]
+
+    def test_pickle(self, rossi, regression_models):
         from pickle import dump
-        for fitter in [CoxPHFitter, AalenAdditiveFitter]:
+        for fitter in regression_models:
             output = stringio()
-            f = fitter().fit(rossi, 'week', 'arrest')
+            f = fitter.fit(rossi, 'week', 'arrest')
             dump(f, output)
 
-    def test_fit_methods_require_duration_col(self):
-        X = load_regression_dataset()
+    def test_fit_methods_require_duration_col(self, rossi, regression_models):
+        for fitter in regression_models:
+            with pytest.raises(TypeError):
+                fitter.fit(rossi)
 
-        aaf = AalenAdditiveFitter()
-        cph = CoxPHFitter()
+    def test_fit_methods_can_accept_optional_event_col_param(self, regression_models, rossi):
+        for model in regression_models:
+            model.fit(rossi, 'week', event_col='arrest')
+            assert_series_equal(model.event_observed.sort_index(), rossi['arrest'].astype(bool), check_names=False)
 
-        with pytest.raises(TypeError):
-            aaf.fit(X)
-        with pytest.raises(TypeError):
-            cph.fit(X)
+            model.fit(rossi, 'week')
+            npt.assert_array_equal(model.event_observed.values, np.ones(rossi.shape[0]))
 
-    def test_fit_methods_can_accept_optional_event_col_param(self):
-        X = load_regression_dataset()
+    def test_predict_methods_in_regression_return_same_types(self, regression_models, rossi):
 
-        aaf = AalenAdditiveFitter()
-        aaf.fit(X, 'T', event_col='E')
-        assert_series_equal(aaf.event_observed.sort_index(), X['E'].astype(bool), check_names=False)
-
-        aaf.fit(X, 'T')
-        npt.assert_array_equal(aaf.event_observed.values, np.ones(X.shape[0]))
-
-        cph = CoxPHFitter()
-        cph.fit(X, 'T', event_col='E')
-        assert_series_equal(cph.event_observed.sort_index(), X['E'].astype(bool), check_names=False)
-
-        cph.fit(X, 'T')
-        npt.assert_array_equal(cph.event_observed.values, np.ones(X.shape[0]))
-
-    def test_predict_methods_in_regression_return_same_types(self):
-        X = load_regression_dataset()
-
-        aaf = AalenAdditiveFitter()
-        cph = CoxPHFitter()
-
-        aaf.fit(X, duration_col='T', event_col='E')
-        cph.fit(X, duration_col='T', event_col='E')
+        fitted_regression_models = map(lambda model: model.fit(rossi, duration_col='week', event_col='arrest'), regression_models)
 
         for fit_method in ['predict_percentile', 'predict_median', 'predict_expectation', 'predict_survival_function', 'predict_cumulative_hazard']:
-            assert isinstance(getattr(aaf, fit_method)(X), type(getattr(cph, fit_method)(X)))
+            for fitter1, fitter2 in combinations(fitted_regression_models, 2):
+                assert isinstance(getattr(fitter1, fit_method)(rossi), type(getattr(fitter2, fit_method)(rossi)))
 
-    def test_duration_vector_can_be_normalized(self):
-        df = load_kidney_transplant()
-        t = df['time']
-        normalized_df = df.copy()
-        normalized_df['time'] = (normalized_df['time'] - t.mean()) / t.std()
+    def test_duration_vector_can_be_normalized(self, regression_models, rossi):
+        t = rossi['week']
+        normalized_rossi = rossi.copy()
+        normalized_rossi['week'] = (normalized_rossi['week'] - t.mean()) / t.std()
 
-        for fitter in [CoxPHFitter(), AalenAdditiveFitter()]:
+        for fitter in regression_models:
             # we drop indexs since aaf will have a different "time" index.
-            hazards = fitter.fit(df, duration_col='time', event_col='death').hazards_.reset_index(drop=True)
-            hazards_norm = fitter.fit(normalized_df, duration_col='time', event_col='death').hazards_.reset_index(drop=True)
+            hazards = fitter.fit(rossi, duration_col='week', event_col='arrest').hazards_.reset_index(drop=True)
+            hazards_norm = fitter.fit(normalized_rossi, duration_col='week', event_col='arrest').hazards_.reset_index(drop=True)
             assert_frame_equal(hazards, hazards_norm)
 
-    def test_prediction_methods_respect_index(self, data_pred2):
-        x = data_pred2[['x1', 'x2']].ix[:3].sort_index(ascending=False)
+    def test_prediction_methods_respect_index(self, regression_models, rossi):
+        X = rossi.ix[:3].sort_index(ascending=False)
         expected_index = pd.Index(np.array([3, 2, 1, 0]))
 
-        cph = CoxPHFitter()
-        cph.fit(data_pred2, duration_col='t', event_col='E')
-        npt.assert_array_equal(cph.predict_partial_hazard(x).index, expected_index)
-        npt.assert_array_equal(cph.predict_percentile(x).index, expected_index)
-        npt.assert_array_equal(cph.predict_expectation(x).index, expected_index)
-
-        aaf = AalenAdditiveFitter()
-        aaf.fit(data_pred2, duration_col='t', event_col='E')
-        npt.assert_array_equal(aaf.predict_percentile(x).index, expected_index)
-        npt.assert_array_equal(aaf.predict_expectation(x).index, expected_index)
+        for fitter in regression_models:
+            fitter.fit(rossi, duration_col='week', event_col='arrest')
+            npt.assert_array_equal(fitter.predict_percentile(X).index, expected_index)
+            npt.assert_array_equal(fitter.predict_expectation(X).index, expected_index)
+            try:
+                npt.assert_array_equal(fitter.predict_partial_hazard(X).index, expected_index)
+            except AttributeError:
+                pass
 
 
 class TestCoxPHFitter():
@@ -696,13 +678,13 @@ Concordance = 0.640""".strip().split()
         assert np.abs(newton(X, T, E)[0][0] - -0.0335) < 0.0001
 
     def test_fit_method(self, data_nus):
-        cf = CoxPHFitter(normalize=False)
+        cf = CoxPHFitter()
         cf.fit(data_nus, duration_col='t', event_col='E')
         assert np.abs(cf.hazards_.ix[0][0] - -0.0335) < 0.0001
 
     def test_using_dataframes_vs_numpy_arrays(self, data_pred2):
         # First without normalization
-        cf = CoxPHFitter(normalize=False)
+        cf = CoxPHFitter()
         cf.fit(data_pred2, 't', 'E')
 
         X = data_pred2[cf.data.columns]
@@ -712,22 +694,12 @@ Concordance = 0.640""".strip().split()
         hazards_n = cf.predict_partial_hazard(np.array(X))
         assert np.all(hazards == hazards_n)
 
-        # Now with normalization
-        cf = CoxPHFitter(normalize=True)
-        cf.fit(data_pred2, 't', 'E')
-
-        hazards = cf.predict_partial_hazard(X)
-
-        # Compare with array argument
-        hazards_n = cf.predict_partial_hazard(np.array(X))
-        assert np.all(hazards == hazards_n)
-
     def test_data_normalization(self, data_pred2):
         # During fit, CoxPH copies the training data and normalizes it.
         # Future calls should be normalized in the same way and
         # internal training set should not be saved in a normalized state.
 
-        cf = CoxPHFitter(normalize=True)
+        cf = CoxPHFitter()
         cf.fit(data_pred2, duration_col='t', event_col='E')
 
         # Internal training set
@@ -749,20 +721,17 @@ Concordance = 0.640""".strip().split()
         e = data_pred2['E']
         X = data_pred2[['x1', 'x2']]
 
-        for normalize in [True, False]:
-            msg = ("Predict methods should get the same concordance" +
-                   " when {}normalizing".format('' if normalize else 'not '))
-            cf = CoxPHFitter(normalize=normalize)
-            cf.fit(data_pred2, duration_col='t', event_col='E')
+        cf = CoxPHFitter()
+        cf.fit(data_pred2, duration_col='t', event_col='E')
 
-            # Base comparison is partial_hazards
-            ci_ph = concordance_index(t, -cf.predict_partial_hazard(X).values, e)
+        # Base comparison is partial_hazards
+        ci_ph = concordance_index(t, -cf.predict_partial_hazard(X).values, e)
 
-            ci_med = concordance_index(t, cf.predict_median(X).ravel(), e)
-            assert ci_ph == ci_med, msg
+        ci_med = concordance_index(t, cf.predict_median(X).ravel(), e)
+        assert ci_ph == ci_med
 
-            ci_exp = concordance_index(t, cf.predict_expectation(X).ravel(), e)
-            assert ci_ph == ci_exp, msg
+        ci_exp = concordance_index(t, cf.predict_expectation(X).ravel(), e)
+        assert ci_ph == ci_exp
 
     def test_crossval_for_cox_ph_with_normalizing_times(self, data_pred2, data_pred1):
         cf = CoxPHFitter()
@@ -836,16 +805,29 @@ Concordance = 0.640""".strip().split()
             assert mean_score > expected, msg.format(expected, mean_score)
 
     def test_output_against_R(self, rossi):
-        # from http://cran.r-project.org/doc/contrib/Fox-Companion/appendix-cox-regression.pdf
-        # Link is now broken, but this is the code:
-        #
-        # rossi <- read.csv('.../lifelines/datasets/rossi.csv')
-        # mod.allison <- coxph(Surv(week, arrest) ~ fin + age + race + wexp + mar + paro + prio,
-        #     data=rossi)
-        # cat(round(mod.allison$coefficients, 4), sep=", ")
+        """
+        from http://cran.r-project.org/doc/contrib/Fox-Companion/appendix-cox-regression.pdf
+        Link is now broken, but this is the code:
+
+        rossi <- read.csv('.../lifelines/datasets/rossi.csv')
+        mod.allison <- coxph(Surv(week, arrest) ~ fin + age + race + wexp + mar + paro + prio,
+            data=rossi)
+        cat(round(mod.allison$coefficients, 4), sep=", ")
+        """
         expected = np.array([[-0.3794, -0.0574, 0.3139, -0.1498, -0.4337, -0.0849,  0.0915]])
-        cf = CoxPHFitter(normalize=False)
+        cf = CoxPHFitter()
         cf.fit(rossi, duration_col='week', event_col='arrest')
+        npt.assert_array_almost_equal(cf.hazards_.values, expected, decimal=3)
+
+    def test_output_with_strata_against_R(self, rossi):
+        """
+        rossi <- read.csv('.../lifelines/datasets/rossi.csv')
+        r = coxph(formula = Surv(week, arrest) ~ fin + age + strata(race,
+                    paro, mar, wexp) + prio, data = rossi)
+        """
+        expected = np.array([[-0.3355, -0.0590, 0.1002]])
+        cf = CoxPHFitter()
+        cf.fit(rossi, duration_col='week', event_col='arrest', strata=['race', 'paro', 'mar', 'wexp'])
         npt.assert_array_almost_equal(cf.hazards_.values, expected, decimal=3)
 
     def test_penalized_output_against_R(self, rossi):
@@ -853,10 +835,10 @@ Concordance = 0.640""".strip().split()
         #
         # rossi <- read.csv('.../lifelines/datasets/rossi.csv')
         # mod.allison <- coxph(Surv(week, arrest) ~ ridge(fin, age, race, wexp, mar, paro, prio,
-        #                                                 theta=1.0, scale=FALSE), data=rossi)
+        #                                                 theta=1.0, scale=TRUE), data=rossi)
         # cat(round(mod.allison$coefficients, 4), sep=", ")
-        expected = np.array([[-0.3641, -0.0580, 0.2894, -0.1496, -0.3837, -0.0822, 0.0913]])
-        cf = CoxPHFitter(normalize=False, penalizer=1.0)
+        expected = np.array([[-0.3761, -0.0565, 0.3099, -0.1532, -0.4295, -0.0837, 0.0909]])
+        cf = CoxPHFitter(penalizer=1.0)
         cf.fit(rossi, duration_col='week', event_col='arrest')
         npt.assert_array_almost_equal(cf.hazards_.values, expected, decimal=3)
 
@@ -865,7 +847,7 @@ Concordance = 0.640""".strip().split()
         df = load_kidney_transplant(usecols=['time', 'death',
                                              'black_male', 'white_male',
                                              'black_female'])
-        cf = CoxPHFitter(normalize=False)
+        cf = CoxPHFitter()
         cf.fit(df, duration_col='time', event_col='death')
 
         # coefs
@@ -876,7 +858,7 @@ Concordance = 0.640""".strip().split()
     def test_se_against_Survival_Analysis_by_John_Klein_and_Melvin_Moeschberger(self):
         # see table 8.1 in Survival Analysis by John P. Klein and Melvin L. Moeschberger, Second Edition
         df = load_larynx()
-        cf = CoxPHFitter(normalize=False)
+        cf = CoxPHFitter()
         cf.fit(df, duration_col='time', event_col='death')
 
         # standard errors
@@ -915,38 +897,55 @@ Concordance = 0.640""".strip().split()
         cp.fit(df, 'T', 'Status', strata=['Stratum'])
         assert True
 
-    def test_strata_against_r_output(self, rossi):
+    def test_strata_against_R_output(self, rossi):
         """
+        > library(survival)
+        > rossi = read.csv('.../lifelines/datasets/rossi.csv')
         > r = coxph(formula = Surv(week, arrest) ~ fin + age + strata(race,
             paro, mar, wexp) + prio, data = rossi)
-        > r
         > r$loglik
         """
 
-        cp = CoxPHFitter(normalize=False)
+        cp = CoxPHFitter()
         cp.fit(rossi, 'week', 'arrest', strata=['race', 'paro', 'mar', 'wexp'], include_likelihood=True)
 
         npt.assert_almost_equal(cp.summary['coef'].values, [-0.335, -0.059, 0.100], decimal=3)
         assert abs(cp._log_likelihood - -436.9339) / 436.9339 < 0.01
 
+    def test_hazard_works_as_intended_with_strata_against_R_output(self, rossi):
+        """
+        > library(survival)
+        > rossi = read.csv('.../lifelines/datasets/rossi.csv')
+        > r = coxph(formula = Surv(week, arrest) ~ fin + age + strata(race,
+            paro, mar, wexp) + prio, data = rossi)
+        > basehaz(r, centered=TRUE)
+        """
+        cp = CoxPHFitter()
+        cp.fit(rossi, 'week', 'arrest', strata=['race', 'paro', 'mar', 'wexp'])
+        npt.assert_almost_equal(cp.baseline_cumulative_hazard_[(0, 0, 0, 0)].ix[[14, 35, 37, 43, 52]].values, [0.076600555, 0.169748261, 0.272088807, 0.396562717, 0.396562717], decimal=2)
+        npt.assert_almost_equal(cp.baseline_cumulative_hazard_[(0, 0, 0, 1)].ix[[27, 43, 48, 52]].values, [0.095499001, 0.204196905, 0.338393113, 0.338393113], decimal=2)
 
-    def test_predict_log_hazard_relative_to_mean_with_normalization(self, rossi):
-        cox = CoxPHFitter(normalize=True)
-        cox.fit(rossi, 'week', 'arrest')
-
-        # they are equal because the data is normalized, so the mean of the covarites is all 0,
-        # thus exp(beta * 0) == 1, so exp(beta * X)/exp(beta * 0) = exp(beta * X)
-        assert_frame_equal(cox.predict_log_hazard_relative_to_mean(rossi), np.log(cox.predict_partial_hazard(rossi)))
-
-
-    def test_predict_log_hazard_relative_to_mean_without_normalization(self, rossi):
-        cox = CoxPHFitter(normalize=False)
+    def test_predict_log_hazard_relative_to_mean(self, rossi):
+        cox = CoxPHFitter()
         cox.fit(rossi, 'week', 'arrest')
         log_relative_hazards = cox.predict_log_hazard_relative_to_mean(rossi)
         means = rossi.mean(0).to_frame().T
-        assert cox.predict_partial_hazard(means).values[0][0] != 1.0  
+        assert cox.predict_partial_hazard(means).values[0][0] != 1.0
         assert_frame_equal(log_relative_hazards, np.log(cox.predict_partial_hazard(rossi) / cox.predict_partial_hazard(means).squeeze()))
 
+    def test_warning_is_raised_if_df_has_a_near_constant_column(self, rossi):
+        cox = CoxPHFitter()
+        rossi['constant'] = 1.0
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            try:
+                cox.fit(rossi, 'week', 'arrest')
+            except:
+                pass
+            assert len(w) == 1
+            assert issubclass(w[-1].category, RuntimeWarning)
+            assert "variance" in str(w[-1].message)
 
 
 class TestAalenAdditiveFitter():
@@ -961,7 +960,6 @@ class TestAalenAdditiveFitter():
         aaf.fit(rossi, event_col='arrest', duration_col='week')
         cum_hazards = aaf.predict_cumulative_hazard(rossi)
         assert (cum_hazards < 0).stack().mean() == 0
-
 
     def test_using_a_custom_timeline_in_static_fitting(self, rossi):
         aaf = AalenAdditiveFitter()
@@ -1010,7 +1008,7 @@ class TestAalenAdditiveFitter():
 
         misorder = ['age', 'race', 'wexp', 'mar', 'paro', 'prio', 'fin']
         natural_order = rossi.columns.drop(['week', 'arrest'])
-        deleted_order = rossi.columns - ['week', 'arrest']
+        deleted_order = rossi.columns.difference(['week', 'arrest'])
         assert_frame_equal(aaf.predict_median(rossi[natural_order]), aaf.predict_median(rossi[misorder]))
         assert_frame_equal(aaf.predict_median(rossi[natural_order]), aaf.predict_median(rossi[deleted_order]))
 

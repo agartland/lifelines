@@ -9,7 +9,7 @@ from numpy.linalg import norm, lstsq
 from numpy.random import randn
 from lifelines.estimation import CoxPHFitter
 from lifelines.datasets import (load_regression_dataset, load_larynx,
-                        load_waltons, load_rossi)
+                                load_waltons, load_rossi)
 
 from lifelines import utils
 from lifelines.utils import _concordance_index as fast_cindex
@@ -47,6 +47,19 @@ def test_lstsq_returns_similar_values_to_ridge_regression():
     Y = randn(2)
     expected = lstsq(X, Y)[0]
     assert norm(utils.ridge_regression(X, Y)[0] - expected) < 10e-4
+
+
+def test_lstsq_returns_correct_values():
+    X = np.array([[-1.0, -1.0], [-1.0, 0], [-.8, -1.0],
+                  [1.0, 1.0], [1.0, 0.0]])
+    y = [1, 1, 1, -1, -1]
+    beta,V = utils.ridge_regression(X, y)
+    expected_beta = [-0.98684211, -0.07894737]
+    expected_v = [[-0.03289474, -0.49342105, 0.06578947, 0.03289474, 0.49342105],
+		  [-0.30263158, 0.46052632, -0.39473684, 0.30263158, -0.46052632]]
+    assert(norm(beta - expected_beta) < 10e-4)
+    for V_row, e_v_row in zip(V, expected_v):
+       assert(norm(V_row - e_v_row) < 1e-4)
 
 
 def test_l1_log_loss_with_no_observed():
@@ -207,13 +220,15 @@ def test_group_survival_table_from_events_on_waltons_data():
     assert all(removed.index == observed.index)
     assert all(removed.index == censored.index)
 
+
 def test_survival_table_from_events_at_risk_column():
     df = load_waltons()
     # from R
-    expected = [163.0, 162.0, 160.0, 157.0, 154.0, 152.0, 151.0, 148.0, 144.0, 139.0, 134.0, 133.0, 130.0, 128.0, 126.0, 119.0, 118.0, 
+    expected = [163.0, 162.0, 160.0, 157.0, 154.0, 152.0, 151.0, 148.0, 144.0, 139.0, 134.0, 133.0, 130.0, 128.0, 126.0, 119.0, 118.0,
                 108.0, 107.0, 99.0, 96.0, 89.0, 87.0, 69.0, 65.0, 49.0, 38.0, 36.0, 27.0, 24.0, 14.0, 1.0]
     df = utils.survival_table_from_events(df['T'], df['E'])
-    assert list(df['at_risk'][1:]) == expected # skip the first event as that is the birth time, 0.
+    assert list(df['at_risk'][1:]) == expected  # skip the first event as that is the birth time, 0.
+
 
 def test_survival_table_to_events_casts_to_float():
     T, C = np.array([1, 2, 3, 4, 4, 5]), np.array([True, False, True, True, True, True])
@@ -265,6 +280,11 @@ def test_cross_validator_with_predictor_and_kwargs():
     assert len(results_06) == 3
 
 
+def test_cross_validator_with_stratified_cox_model():
+    cf = CoxPHFitter(strata=['race'])
+    utils.k_fold_cross_validation(cf, load_rossi(), duration_col='week', event_col='arrest')
+
+
 def test_cross_validator_with_specific_loss_function():
     def square_loss(y_actual, y_pred):
         return ((y_actual - y_pred) ** 2).mean()
@@ -300,6 +320,13 @@ def test_concordance_index_returns_same_after_shifting():
     T = np.array([1, 2, 3, 4, 5, 6])
     T_ = np.array([2, 1, 4, 6, 5, 3])
     assert utils.concordance_index(T, T_) == utils.concordance_index(T - 5, T_ - 5) == utils.concordance_index(T, T_ - 5) == utils.concordance_index(T - 5, T_)
+
+
+def test_both_concordance_index_function_deal_with_ties_the_same_way():
+    actual_times = np.array([1, 1, 2])
+    predicted_times = np.array([1, 2, 3])
+    obs = np.ones(3)
+    assert fast_cindex(actual_times, predicted_times, obs) == slow_cindex(actual_times, predicted_times, obs) == 1.0
 
 
 def test_survival_table_from_events_with_non_negative_T_and_no_lagged_births():

@@ -6,6 +6,7 @@ import pandas as pd
 from lifelines.fitters import UnivariateFitter
 from lifelines.utils import _preprocess_inputs, _additive_estimate, StatError, inv_normal_cdf,\
     median_survival_times
+from lifelines.plotting import plot_loglogs
 
 
 class KaplanMeierFitter(UnivariateFitter):
@@ -78,6 +79,7 @@ class KaplanMeierFitter(UnivariateFitter):
         # plotting functions
         self.plot = self._plot_estimate(estimate_name)
         setattr(self, "plot_" + estimate_name, self.plot)
+        self.plot_loglogs = plot_loglogs(self)
         return self
 
     def _bounds(self, cumulative_sq_, alpha, ci_labels):
@@ -95,7 +97,7 @@ class KaplanMeierFitter(UnivariateFitter):
         return df
 
     def _additive_f(self, population, deaths):
-        np.seterr(invalid='ignore')
+        np.seterr(invalid='ignore', divide='ignore')
         return (np.log(population - deaths) - np.log(population))
 
     def _additive_var(self, population, deaths):

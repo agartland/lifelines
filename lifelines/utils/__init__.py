@@ -4,7 +4,7 @@ import warnings
 from datetime import datetime
 
 import numpy as np
-from numpy.linalg import inv
+from numpy.linalg import solve
 import pandas as pd
 from pandas import to_datetime
 
@@ -119,7 +119,7 @@ def group_survival_table_from_events(groups, durations, event_observed, birth_ti
 
     assert n == np.max(birth_times.shape), "inputs must be of the same length."
 
-    groups, durations, event_observed, birth_times = [pd.Series(np.reshape(data, (n,))) for data in [groups, durations, event_observed, birth_times]]
+    groups, durations, event_observed, birth_times = [pd.Series(np.asarray(data).reshape(n,)) for data in [groups, durations, event_observed, birth_times]]
     unique_groups = groups.unique()
 
     for i, group in enumerate(unique_groups):
@@ -195,10 +195,9 @@ def survival_table_from_events(death_times, event_observed, birth_times=None,
     births = pd.DataFrame(birth_times, columns=['event_at'])
     births[entrance] = weights
     births_table = births.groupby('event_at').sum()
-
     event_table = death_table.join(births_table, how='outer', sort=True).fillna(0)  # http://wesmckinney.com/blog/?p=414
     event_table[at_risk] = event_table[entrance].cumsum() - event_table[removed].cumsum().shift(1).fillna(0)
-    return event_table.astype(float)
+    return event_table.astype(int)
 
 
 def survival_events_from_table(event_table, observed_deaths_col="observed", censored_col="censored"):
@@ -270,7 +269,7 @@ def datetimes_to_durations(start_times, end_times, fill_date=datetime.today(), f
     C = ~(pd.isnull(end_times).values | end_times.isin(na_values or [""]))
     end_times[~C] = fill_date
     start_times_ = to_datetime(start_times, dayfirst=dayfirst)
-    end_times_ = to_datetime(end_times, dayfirst=dayfirst, coerce=True)
+    end_times_ = to_datetime(end_times, dayfirst=dayfirst, errors='coerce')
 
     deaths_after_cutoff = end_times_ > fill_date
     C[deaths_after_cutoff] = False
@@ -465,12 +464,12 @@ def k_fold_cross_validation(fitters, df, duration_col, event_col=None,
         event_col = 'E'
         df[event_col] = 1.
 
-    df = df.reindex(np.random.permutation(df.index)).sort(event_col)
+    df = df.reindex(np.random.permutation(df.index)).sort_values(event_col)
 
     assignments = np.array((n // k + 1) * list(range(1, k + 1)))
     assignments = assignments[:n]
 
-    testing_columns = df.columns - [duration_col, event_col]
+    testing_columns = df.columns.difference([duration_col, event_col])
 
     for i in range(1, k + 1):
 
@@ -565,11 +564,11 @@ def ridge_regression(X, Y, c1=0.0, c2=0.0, offset=None):
     if offset is None:
         offset = np.zeros((d,))
 
-    V_1 = inv(np.dot(X.T, X) + penalizer_matrix)
-    V_2 = (np.dot(X.T, Y) + c2 * offset)
-    beta = np.dot(V_1, V_2)
+    A = (np.dot(X.T, X) + penalizer_matrix)
+    b = (np.dot(X.T, Y) + c2 * offset)
 
-    return beta, np.dot(V_1, X.T)
+    # rather than explicitly computing the inverse, just solve the system of equations
+    return (solve(A, b), solve(A, X.T))
 
 
 def _smart_search(minimizing_function, n, *args):
@@ -869,6 +868,9 @@ def _concordance_index(event_times, predicted_event_times, event_observed):
         num_correct += correct
         num_tied += tied
 
+    if num_pairs == 0:
+        raise ZeroDivisionError("No admissable pairs in the dataset.")
+
     return (num_correct + num_tied / 2) / num_pairs
 
 
@@ -918,4 +920,6 @@ def _naive_concordance_index(event_times, predicted_event_times, event_observed)
                 paircount += 1.0
                 csum += concordance_value(time_a, time_b, pred_a, pred_b)
 
+    if paircount == 0:
+        raise ZeroDivisionError("No admissable pairs in the dataset.")
     return csum / paircount

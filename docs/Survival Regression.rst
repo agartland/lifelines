@@ -41,9 +41,9 @@ variables ``un_continent_name`` (eg: Asia, North America,...), the
 ``regime`` type (eg: monarchy, civilan,...) and the year the regime
 started in, ``start_year``.
 
-Aalens additive model typically does not estimate the individual
+Aalen's additive model typically does not estimate the individual
 :math:`b_i(t)` but instead estimates :math:`\int_0^t b_i(s) \; ds`
-(similar to estimate of the hazard rate using ``NelsonAalenFitter``
+(similar to the estimate of the hazard rate using ``NelsonAalenFitter``
 above). This is important to keep in mind when analzying the output.
 
 .. code:: python
@@ -156,7 +156,7 @@ above). This is important to keep in mind when analzying the output.
 
 
 
-I'm using the lovely library ``patsy`` <https://github.com/pydata/patsy>`__ here to create a
+I'm using the lovely library `patsy <https://github.com/pydata/patsy>`__ here to create a
 covariance matrix from my original dataframe.
 
 .. code:: python
@@ -391,9 +391,9 @@ Prime Minister Stephen Harper.
 Cox's Proportional Hazard model
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-New in 0.4.0 is the implementation of the Propotional Hazard's regression model (implemented in 
-R under ``coxph``). It has a similar API to Aalen's Additive model. Like R, it has a ``print_summary``
-function that prints a tabuluar view of coefficients and related stats. 
+New in 0.4.0 is the implementation of the Cox propotional hazards regression model (implemented in 
+R under ``coxph``). It has a similar API to Aalen's additive model. Like R, it has a ``print_summary``
+function that prints a tabular view of coefficients and related stats. 
 
 This example data is from the paper `here <http://socserv.socsci.mcmaster.ca/jfox/Books/Companion/appendix/Appendix-Cox-Regression.pdf>`_.
 
@@ -427,6 +427,21 @@ This example data is from the paper `here <http://socserv.socsci.mcmaster.ca/jfo
 
 To access the coefficients and the baseline hazard, you can use ``cf.hazards_`` and ``cf.baseline_hazard_`` respectively. After fitting, you can use use the suite of prediction methods (similar to Aalen's additve model above): ``.predict_hazard(X)``, ``.predict_survival_function(X)``, etc. 
 
+Checking the proportional hazards assumption
+################
+
+A quick and visual way to check the proportional hazards assumption of a variable is to plot the survival curves segmented by the values of the variable. If the survival curves are the same "shape", and differ only by constant factor, then the assumption holds. A more clear way to see this is to plot what's called the loglogs curve: the log(-log(survival curve)) vs log(time). If the curves are parallel (and hence do not cross each other), then it's likely the variable satisfies the assumption. If the curves do cross, likely you'll have to "stratify" the variable (see next section). In lifelines, the ``KaplanMeierFitter`` object has a ``.plot_loglogs`` function for this purpose. 
+
+The following is the loglogs curves of two variables in our regime dataset. The first is the democracy type, which does have (close to) parallel lines, hence satisfies our assumption:
+
+.. image:: images/lls_democracy.png
+
+
+The second variable is the regime type, and this variable does not follow the proportional hazards assumption.
+
+.. image:: images/lls_regime_type.png
+
+
 Stratification
 ################
 
@@ -453,19 +468,20 @@ Sometimes a covariate may not obey the proportional hazard assumption. In this c
     Concordance = 0.638
     """
 
+
 Model Selection in Survival Regression
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-With censorship, it's not correct to use a loss function like mean-squared-error or 
-mean-absolute-loss. Instead, one measure is the c-index, or concordance-index. This measure
-evaluates the ordering of predicted times: how correct is the ordering? It is infact a generalization
-of AUC, another common loss function, and is interpretted similarly: 
+If censorship is present, it's not appropriate to use a loss function like mean-squared-error or 
+mean-absolute-loss. Instead, one measure is the concordance-index, also known as the c-index. This measure
+evaluates the accuracy of the ordering of predicted time. It is infact a generalization
+of AUC, another common loss function, and is interpreted similarly: 
 
 * 0.5 is the expected result from random predictions,
 * 1.0 is perfect concordance and,
 * 0.0 is perfect anti-concordance (multiply predictions with -1 to get 1.0)
 
-The measure is implemented in lifelines under `lifelines.utils.concordance_index` and accepts the actual times (along with any censorships), and the predicted times.
+The measure is implemented in lifelines under `lifelines.utils.concordance_index` and accepts the actual times (along with any censorships) and the predicted times.
 
 Cross Validation
 ######################################

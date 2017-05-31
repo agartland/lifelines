@@ -168,6 +168,7 @@ def add_at_risk_counts(*fitters, **kwargs):
     return ax
 
 
+
 def plot_lifetimes(lifetimes, event_observed=None, birthtimes=None,
                    order=False, block=True):
     """
@@ -216,15 +217,19 @@ def set_kwargs_ax(kwargs):
     if "ax" not in kwargs:
         kwargs["ax"] = plt.figure().add_subplot(111)
 
+
 def set_kwargs_color(kwargs):
     import matplotlib as mpl
-    if int(mpl.__version__.split('.')[1]) > 4:
-        # https://github.com/CamDavidsonPilon/lifelines/issues/191#issuecomment-145275656
+    major_version, minor_version = mpl.__version__.split('.')[:2]
+    if int(major_version) == 1 and int(minor_version) < 5:
+        raise ValueError('Matplotlib versions less than 1.5 no longer supported.')
+    elif int(major_version) == 2:
         kwargs['color'] = coalesce(kwargs.get('c'), kwargs.get('color'),
-                                   next(kwargs["ax"]._get_lines.prop_cycler)['color'])
+                                   kwargs["ax"]._get_lines.get_next_color())
     else:
         kwargs['color'] = coalesce(kwargs.get('c'), kwargs.get('color'),
-                                   next(kwargs["ax"]._get_lines.color_cycle))
+                                   next(kwargs["ax"]._get_lines.prop_cycler)['color'])
+
 
 def set_kwargs_drawstyle(kwargs):
     kwargs['drawstyle'] = kwargs.get('drawstyle', 'steps-post')
@@ -238,6 +243,55 @@ def create_dataframe_slicer(iloc, ix):
     return lambda df: getattr(df, get_method)[user_submitted_slice]
 
 
+def plot_loglogs(cls):
+    doc_string = """
+    Specifies a plot of the log(-log(SV)) versus log(time) where SV is the estimated survival function.
+    """
+
+    def _plot_loglogs(ix=None, iloc=None, show_censors=False, censor_styles=None, **kwargs):
+
+        loglog = lambda s: np.log(-np.log(s))
+
+        if (ix is not None) and (iloc is not None):
+            raise ValueError('Cannot set both ix and iloc in call to .plot().')
+
+        if censor_styles is None:
+            censor_styles = {}
+
+        set_kwargs_ax(kwargs)
+        set_kwargs_color(kwargs)
+        set_kwargs_drawstyle(kwargs)
+        kwargs['logx'] = True
+
+        dataframe_slicer = create_dataframe_slicer(iloc, ix)
+
+        # plot censors
+        ax = kwargs['ax']
+        colour = kwargs['color']
+
+        if show_censors and cls.event_table['censored'].sum() > 0:
+            cs = {
+                'marker': '+',
+                'ms': 12,
+                'mew': 1
+            }
+            cs.update(censor_styles)
+            times = dataframe_slicer(cls.event_table.ix[(cls.event_table['censored'] > 0)]).index.values.astype(float)
+            v = cls.predict(times)
+            # don't log times, as Pandas will take care of all log-scaling later.
+            ax.plot(times, loglog(v), linestyle='None',
+                    color=colour, **cs)
+
+        # plot estimate
+        dataframe_slicer(loglog(cls.survival_function_)).plot(**kwargs)
+        ax.set_xlabel('log(timeline)')
+        ax.set_ylabel('log(-log(survival_function_))')
+        return ax
+
+    _plot_loglogs.__doc__ = doc_string
+    return _plot_loglogs
+
+
 def plot_estimate(cls, estimate):
     doc_string = """"
         Plots a pretty version of the fitted %s.
@@ -245,8 +299,6 @@ def plot_estimate(cls, estimate):
         Matplotlib plot arguments can be passed in inside the kwargs, plus
 
         Parameters:
-          flat: an opiniated design style with stepped lines and no shading.
-                Similar to R's plotting. Default: False
           show_censors: place markers at censorship events. Default: False
           censor_styles: If show_censors, this dictionary will be passed into
                          the plot call.
@@ -272,12 +324,10 @@ def plot_estimate(cls, estimate):
           ax: a pyplot axis object
         """ % estimate
 
-    def plot(ix=None, iloc=None, flat=False, show_censors=False,
+    def plot(ix=None, iloc=None, show_censors=False,
              censor_styles=None, ci_legend=False, ci_force_lines=False,
              ci_alpha=0.25, ci_show=True, at_risk_counts=False,
              bandwidth=None, **kwargs):
-
-        from matplotlib import pyplot as plt
 
         if censor_styles is None:
             censor_styles = {}
@@ -289,11 +339,6 @@ def plot_estimate(cls, estimate):
         set_kwargs_color(kwargs)
         set_kwargs_drawstyle(kwargs)
 
-        # R-style graphics
-        if flat:
-            ci_force_lines = True
-            show_censors = True
-
         if estimate == "hazard_":
             if bandwidth is None:
                 raise ValueError('Must specify a bandwidth parameter in the call to plot_hazard.')
@@ -304,7 +349,6 @@ def plot_estimate(cls, estimate):
             estimate_ = getattr(cls, estimate)
             confidence_interval_ = getattr(cls, 'confidence_interval_')
 
-
         dataframe_slicer = create_dataframe_slicer(iloc, ix)
 
         # plot censors
@@ -313,15 +357,15 @@ def plot_estimate(cls, estimate):
 
         if show_censors and cls.event_table['censored'].sum() > 0:
             cs = {
-                'marker': '+', 
-                'ms': 12, 
+                'marker': '+',
+                'ms': 12,
                 'mew': 1
             }
             cs.update(censor_styles)
             times = dataframe_slicer(cls.event_table.ix[(cls.event_table['censored'] > 0)]).index.values.astype(float)
             v = cls.predict(times)
             ax.plot(times, v, linestyle='None',
-                              color=colour, **cs)
+                    color=colour, **cs)
 
         # plot estimate
         dataframe_slicer(estimate_).plot(**kwargs)
@@ -330,9 +374,9 @@ def plot_estimate(cls, estimate):
         if ci_show:
             if ci_force_lines:
                 dataframe_slicer(confidence_interval_).plot(linestyle="-", linewidth=1,
-                                                   color=[colour], legend=True,
-                                                   drawstyle=kwargs.get('drawstyle', 'default'),
-                                                   ax=ax, alpha=0.6)
+                                                            color=[colour], legend=ci_legend,
+                                                            drawstyle=kwargs.get('drawstyle', 'default'),
+                                                            ax=ax, alpha=0.6)
             else:
                 x = dataframe_slicer(confidence_interval_).index.values.astype(float)
                 lower = dataframe_slicer(confidence_interval_.filter(like='lower')).values[:, 0]
@@ -340,6 +384,7 @@ def plot_estimate(cls, estimate):
                 fill_between_steps(x, lower, y2=upper, ax=ax,
                                    alpha=ci_alpha, color=colour,
                                    linewidth=1.0)
+
 
         if at_risk_counts:
             add_at_risk_counts(cls, ax=ax)

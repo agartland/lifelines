@@ -1,6 +1,28 @@
 ### Changelogs
 
-#### Forthcoming 0.9.0
+#### 0.10.0
+ - corrected bug that was returning the wrong baseline survival and hazard values in `CoxPHFitter` when `normalize=True`. 
+ - removed  `normalize` kwarg in `CoxPHFitter`. This was causing lots of confusion for users, and added code complexity. It's really nice to be able to remove it.
+ - correcting column name in `CoxPHFitter.baseline_survival_`
+ - `CoxPHFitter.baseline_cumulative_hazard_` is always centered, to mimic R's `basehaz` API.
+ - new `predict_log_partial_hazards` to `CoxPHFitter`
+
+#### 0.9.4
+ - adding `plot_loglogs` to `KaplanMeierFitter`
+ - added a (correct) check to see if some columns in a dataset will cause convergence problems.
+ - removing `flat` argument in `plot` methods. It was causing confusion. To replicate it, one can set `ci_force_lines=True` and `show_censors=True`.
+ - adding `strata` keyword argument to `CoxPHFitter` on initialization (ex: `CoxPHFitter(strata=['v1', 'v2'])`. Why? Fitters initialized with `strata` can now be passed into `k_fold_cross_validation`, plus it makes unit testing `strata` fitters easier. 
+ - If using `strata` in `CoxPHFitter`, access to strata specific baseline hazards and survival functions are available (previously it was a blended valie). Prediction also uses the specific baseline hazards/survivals. 
+ - performance improvements in `CoxPHFitter` - should see at least a 10% speed improvement in `fit`.
+
+#### 0.9.2
+ - deprecates Pandas versions before 0.18.
+ - throw an error if no admissable pairs in the c-index calculation. Previously a NaN was returned.
+
+#### 0.9.1
+ - add two summary functions to Weibull and Exponential fitter, solves #224
+
+#### 0.9.0
  - new prediction function in `CoxPHFitter`, `predict_log_hazard_relative_to_mean`, that mimics what R's `predict.coxph` does.
  - removing the `predict` method in CoxPHFitter and AalenAdditiveFitter. This is because the choice of `predict_median` as a default was causing too much confusion, and no other natual choice as a default was available. All other `predict_` methods remain. 
  - Default predict method in `k_fold_cross_validation` is now `predict_expectation`
