@@ -1,8 +1,64 @@
 ### Changelogs
 
+#### 0.10.0
+ - corrected bug that was returning the wrong baseline survival and hazard values in `CoxPHFitter` when `normalize=True`. 
+ - removed  `normalize` kwarg in `CoxPHFitter`. This was causing lots of confusion for users, and added code complexity. It's really nice to be able to remove it.
+ - correcting column name in `CoxPHFitter.baseline_survival_`
+ - `CoxPHFitter.baseline_cumulative_hazard_` is always centered, to mimic R's `basehaz` API.
+ - new `predict_log_partial_hazards` to `CoxPHFitter`
+
+#### 0.9.4
+ - adding `plot_loglogs` to `KaplanMeierFitter`
+ - added a (correct) check to see if some columns in a dataset will cause convergence problems.
+ - removing `flat` argument in `plot` methods. It was causing confusion. To replicate it, one can set `ci_force_lines=True` and `show_censors=True`.
+ - adding `strata` keyword argument to `CoxPHFitter` on initialization (ex: `CoxPHFitter(strata=['v1', 'v2'])`. Why? Fitters initialized with `strata` can now be passed into `k_fold_cross_validation`, plus it makes unit testing `strata` fitters easier. 
+ - If using `strata` in `CoxPHFitter`, access to strata specific baseline hazards and survival functions are available (previously it was a blended valie). Prediction also uses the specific baseline hazards/survivals. 
+ - performance improvements in `CoxPHFitter` - should see at least a 10% speed improvement in `fit`.
+
+#### 0.9.2
+ - deprecates Pandas versions before 0.18.
+ - throw an error if no admissable pairs in the c-index calculation. Previously a NaN was returned.
+
+#### 0.9.1
+ - add two summary functions to Weibull and Exponential fitter, solves #224
+
+#### 0.9.0
+ - new prediction function in `CoxPHFitter`, `predict_log_hazard_relative_to_mean`, that mimics what R's `predict.coxph` does.
+ - removing the `predict` method in CoxPHFitter and AalenAdditiveFitter. This is because the choice of `predict_median` as a default was causing too much confusion, and no other natual choice as a default was available. All other `predict_` methods remain. 
+ - Default predict method in `k_fold_cross_validation` is now `predict_expectation`
+
+#### 0.8.1
+ - supports matplotlib 1.5.
+ - introduction of a param `nn_cumulative_hazards` in AalenAdditiveModel's `__init__` (default True). This parameter will truncate all non-negative cumulative hazards in prediction methods to 0. 
+ - bug fixes including:
+    - fixed issue where the while loop in `_newton_rhaphson` would break too early causing a variable not to be set properly. 
+    - scaling of smooth hazards in NelsonAalenFitter was off by a factor of 0.5. 
+
+
+#### 0.8.0
+ - reorganized lifelines directories: 
+    - moved test files out of main directory. 
+    - moved `utils.py` into it's own directory.
+    - moved all estimators `fitters` directory.
+ - added a `at_risk` column to the output of `group_survival_table_from_events` and `survival_table_from_events`
+ - added sample size and power calculations for statistical tests. See `lifeline.statistics. sample_size_necessary_under_cph` and `lifelines.statistics. power_under_cph`. 
+ - fixed a bug when using KaplanMeierFitter for left-censored data. 
+
+
+#### 0.7.1 
+- addition of a l2 `penalizer` to `CoxPHFitter`.
+- dropped Fortran implementation of efficient Python version. Lifelines is pure python once again!
+- addition of `strata` keyword argument to `CoxPHFitter` to allow for stratification of a single or set of 
+categorical variables in your dataset.
+- `datetimes_to_durations` now accepts a list as `na_values`, so multiple values can be checked. 
+- fixed a bug in `datetimes_to_durations` where `fill_date` was not properly being applied.
+- Changed warning in `datetimes_to_durations` to be correct. 
+- refactor each fitter into it's own submodule. For now, the tests are still in the same file. This will also *not* break the API. 
+
+
 #### 0.7.0
 - allow for multiple fitters to be passed into `k_fold_cross_validation`. 
-- statistical tests in `lifelines.statstics`. now return a `StatisticalResult` object with properties like `p_value`, `test_results`, and `summary`.  
+- statistical tests in `lifelines.statistics`. now return a `StatisticalResult` object with properties like `p_value`, `test_results`, and `summary`.  
 - fixed a bug in how log-rank statistical tests are performed. The covariance matrix was not being correctly calculated. This resulted in slightly different p-values. 
 - `WeibullFitter`, `ExponentialFitter`, `KaplanMeierFitter` and `BreslowFlemingHarringtonFitter` all have a `conditional_time_to_event_` property that measures  the median duration remaining until the death event, given survival up until time t.
 

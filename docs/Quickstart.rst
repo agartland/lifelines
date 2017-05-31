@@ -1,13 +1,18 @@
 .. _code_directive:
 
+.. image:: http://i.imgur.com/EOowdSD.png
+
+-------------------------------------
+
+
 Quickstart
-'''''''''''''''''''''''''''''''''''''''
+''''''''''
 
 
 Installation
----------------------------------------
+------------
 
-Install via ``pip``:
+Install via ``pip`` (see `its documentation <https://pip.pypa.io/en/stable/installing>`_ if it is not yet installed on your system):
 
 .. code:: 
 
@@ -16,8 +21,7 @@ Install via ``pip``:
 
 
 Kaplan-Meier and Nelson-Aalen
----------------------------------------
-
+-----------------------------
 
 Let's start by importing some data. We need the durations that individuals are observed for, and whether they "died" or not. 
 
@@ -48,7 +52,7 @@ Let's start by importing some data. We need the durations that individuals are o
 
     from lifelines import KaplanMeierFitter
     kmf = KaplanMeierFitter()
-    kmf.fit(T, event_observed=E) # more succiently, kmf.fit(T,E)
+    kmf.fit(T, event_observed=E)  # more succiently, kmf.fit(T, E)
 
 After calling the ``fit`` method, we have access to new properties like ``survival_function_`` and methods like ``plot()``. The latter is a wrapper around Pandas internal plotting library. 
 
@@ -63,7 +67,7 @@ After calling the ``fit`` method, we have access to new properties like ``surviv
 
 
 Multiple groups
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^
 
 .. code:: python
     
@@ -78,8 +82,8 @@ Multiple groups
 
 .. image:: images/quickstart_multi.png   
 
-Similar functionality exists for the ``NelsonAalenFitter``:
 
+Similar functionality exists for the ``NelsonAalenFitter``:
 
 .. code:: python
 
@@ -89,10 +93,10 @@ Similar functionality exists for the ``NelsonAalenFitter``:
 
 but instead of a ``survival_function_`` being exposed, a ``cumulative_hazard_`` is. 
 
-.. note:: Similar to Scikit-Learn, all statistically estimated quanities append an underscore to the property name. 
+.. note:: Similar to `Scikit-Learn <http://scikit-learn.org>`_, all statistically estimated quantities append an underscore to the property name. 
 
 Getting Data in The Right Format
----------------------------------
+--------------------------------
 
 Often you'll have data that looks like:
 
@@ -109,8 +113,29 @@ Lifelines has some utility functions to transform this dataset into durations an
     T, C = datetimes_to_durations(start_times, end_times, freq='h')
 
 
+Alternatively, perhaps you are interested in viewing the survival table given some durations and censorship vectors.
+
+
+.. code:: python
+    
+    from lifelines.utils import survival_table_from_events
+
+    table = survival_table_from_events(T, E)
+    print table.head()
+
+    """
+              removed  observed  censored  entrance  at_risk
+    event_at
+    0               0         0         0       163      163
+    6               1         1         0         0      163
+    7               2         1         1         0      162
+    9               3         3         0         0      160
+    13              3         3         0         0      157
+    """
+
+
 Survival Regression
----------------------------------
+-------------------
 
 While the above ``KaplanMeierFitter`` and ``NelsonAalenFitter`` are useful, they only give us an "average" view of the population. Often we have specific data at the individual level, either continuous or categorical, that we would like to use. For this, we turn to **survival regression**, specifically ``AalenAdditiveFitter`` or ``CoxPHFitter``.
 
@@ -143,9 +168,10 @@ After fitting, you'll have access to properties like ``cumulative_hazards_`` and
 
 .. code:: python
     
-    x = regression_dataset[regression_dataset.columns - ['E','T']]
-    aaf.predict_survival_function(x.ix[10:12]).plot() #get the unique survival functions of the first two subjects 
+    x = regression_dataset[regression_dataset.columns - ['E', 'T']]
+    aaf.predict_survival_function(x.ix[10:12]).plot()  # get the unique survival functions of the first two subjects 
 
+.. image:: images/quickstart_predict_aaf.png  
 
 Like the above estimators, there is also a built-in plotting method:
 
