@@ -186,6 +186,9 @@ def survival_table_from_events(death_times, event_observed, birth_times=None,
 
     # deal with deaths and censorships
     df = pd.DataFrame(death_times, columns=["event_at"])
+    if weights is None:
+        weights = np.ones((df.shape[0],), dtype=float)
+
     df[removed] = weights
     df[observed] = np.asarray(event_observed) * weights
     death_table = df.groupby("event_at").sum()
@@ -198,7 +201,6 @@ def survival_table_from_events(death_times, event_observed, birth_times=None,
     event_table = death_table.join(births_table, how='outer', sort=True).fillna(0)  # http://wesmckinney.com/blog/?p=414
     event_table[at_risk] = event_table[entrance].cumsum() - event_table[removed].cumsum().shift(1).fillna(0)
     return event_table.astype(int)
-
 
 def survival_events_from_table(event_table, observed_deaths_col="observed", censored_col="censored"):
     """
